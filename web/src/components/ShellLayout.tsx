@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Layers3,
   Radio,
+  Server,
   ScrollText,
   Users,
 } from "lucide-react";
@@ -99,6 +100,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
       list.push(
         { id: "go-users", label: "Перейти в Пользователи и доступ", href: "/admin/users" },
         { id: "go-projects", label: "Перейти в Проекты", href: "/admin/projects" },
+        { id: "go-assets", label: "Перейти в Реестр активов", href: "/admin/assets" },
         { id: "go-audit", label: "Перейти в Журнал аудита", href: "/admin/audit" },
       );
     }
@@ -112,6 +114,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
     ? [
         { to: "/admin/users", label: "Пользователи и доступ", icon: Users },
         { to: "/admin/projects", label: "Проекты", icon: FolderKanban },
+        { to: "/admin/assets", label: "Реестр активов", icon: Server },
         { to: "/admin/products", label: "Продукты", icon: Boxes },
         { to: "/admin/events", label: "События", icon: Radio },
         { to: "/admin/service-accounts", label: "Сервисные учётные записи", icon: KeyRound },

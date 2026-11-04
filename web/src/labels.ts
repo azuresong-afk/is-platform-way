@@ -40,3 +40,22 @@ export const KEY_STATUS: Record<string, { label: string; pill: string }> = {
   retired: { label: "Выведен", pill: "pill-muted" },
   revoked: { label: "Отозван", pill: "pill-danger" },
 };
+
+/** Критичность актива (женский род: «критичность»). */
+export const CRITICALITY: Record<string, string> = {
+  low: "Низкая",
+  medium: "Средняя",
+  high: "Высокая",
+  critical: "Критическая",
+};
+
+/** Поля актива для формы и сообщений. */
+export const ASSET_FIELDS: Record<string, string> = {
+  hostname: "Имя хоста",
+  os_family: "Семейство ОС",
+  os: "ОС",
+  owner: "Владелец",
+  criticality: "Критичность",
+  tags: "Теги",
+  groups: "Группы",
+};

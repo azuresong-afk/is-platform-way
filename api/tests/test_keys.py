@@ -76,6 +76,9 @@ def test_scheduled_rotation_publishes_next_before_it_signs(client, db):
     # Публикация next события не порождает, смена активного ключа — одно событие.
     ev = db.query(Event).filter_by(type="platform.keys.rotated").one()
     assert ev.source == "platform" and ev.data == {"kid": nxt.kid, "revoked": []}
+    assert (
+        ev.project_id is None and ev.subject == f"key/{nxt.kid}"
+    )  # как в docs/integration/vectors/events.json
 
 
 def test_every_signing_kid_was_published_before_use(client, db):

@@ -106,7 +106,7 @@ def _publish_rotated(db: Session, key: SigningKey, revoked: list[str]) -> None:
     from .. import events
 
     events.publish(
-        db, "platform.keys.rotated", {"kid": key.kid, "revoked": revoked}, subject=f"signing_key/{key.kid}"
+        db, "platform.keys.rotated", {"kid": key.kid, "revoked": revoked}, subject=f"key/{key.kid}"
     )
 
 
