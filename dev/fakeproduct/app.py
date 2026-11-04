@@ -12,11 +12,13 @@ import hmac
 import os
 import time
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
+from . import db
 from .auth import Caller, JwksCache, require_project, verify_request
 
 
@@ -40,7 +42,13 @@ def now_iso() -> str:
 
 def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
     pid = spec.manifest["id"]
-    app = FastAPI(title=f"Заглушка: {spec.manifest['title']}")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        db.init(pid, spec.manifest.get("version", ""))
+        yield
+
+    app = FastAPI(title=f"Заглушка: {spec.manifest['title']}", lifespan=lifespan)
     app.state.jwks = jwks or JwksCache(
         os.environ.get("PLATFORM_JWKS_URL", "http://platform-api:8000/.well-known/jwks.json")
     )
@@ -66,6 +74,8 @@ def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
 
     @app.get("/health/ready")
     def ready() -> dict:
+        if not db.ready():
+            raise HTTPException(503, detail="database unavailable")
         return {"status": "ok"}
 
     @app.get("/me")

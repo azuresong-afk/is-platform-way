@@ -20,6 +20,12 @@ export const PROJECT_STATUS: Record<string, { label: string; pill: string }> = {
   archived: { label: "Архив", pill: "pill-muted" },
 };
 
+export const AUDIT_RESULT: Record<string, { label: string; pill: string }> = {
+  success: { label: "Успех", pill: "pill-ok" },
+  failure: { label: "Ошибка", pill: "pill-warn" },
+  denied: { label: "Отказ", pill: "pill-danger" },
+};
+
 export const DELIVERY_STATUS: Record<string, { label: string; pill: string }> = {
   ok: { label: "Доставлено", pill: "pill-ok" },
   pending: { label: "В очереди", pill: "pill-running" },
