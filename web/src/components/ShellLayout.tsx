@@ -17,6 +17,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Layers3,
+  Radio,
   ScrollText,
   Users,
 } from "lucide-react";
@@ -111,6 +112,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         { to: "/admin/users", label: "Пользователи и доступ", icon: Users },
         { to: "/admin/projects", label: "Проекты", icon: FolderKanban },
         { to: "/admin/products", label: "Продукты", icon: Boxes },
+        { to: "/admin/events", label: "События", icon: Radio },
         { to: "/admin/service-accounts", label: "Сервисные учётные записи", icon: KeyRound },
         { to: "/admin/audit", label: "Журнал аудита", icon: ScrollText },
       ]

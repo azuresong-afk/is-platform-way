@@ -25,3 +25,11 @@ export const AUDIT_RESULT: Record<string, { label: string; pill: string }> = {
   failure: { label: "Ошибка", pill: "pill-warn" },
   denied: { label: "Отказ", pill: "pill-danger" },
 };
+
+export const DELIVERY_STATUS: Record<string, { label: string; pill: string }> = {
+  ok: { label: "Доставлено", pill: "pill-ok" },
+  pending: { label: "В очереди", pill: "pill-running" },
+  failed: { label: "Повтор", pill: "pill-warn" },
+  dead: { label: "Не доставлено", pill: "pill-danger" },
+  none: { label: "Нет подписчиков", pill: "pill-muted" },
+};
