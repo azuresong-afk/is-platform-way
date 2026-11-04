@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Radar } from "lucide-react";
 import { MemoryRouter } from "react-router-dom";
@@ -15,6 +15,7 @@ import {
   ProductTabs,
   ProjectPicker,
   QuickSearch,
+  type SearchItem,
   SeverityBadge,
   ThemeToggle,
   useProject,
@@ -227,11 +228,74 @@ describe("QuickSearch", () => {
     const input = await screen.findByRole("combobox", { name: "Строка поиска" });
     await userEvent.type(input, "openssh");
     expect(await screen.findByText("CVE-2024-6387")).toBeInTheDocument();
-    expect(await screen.findByText("Недоступен")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Не ответил вовремя")).toBeInTheDocument(), { timeout: 2000 });
+    expect(await screen.findByText("Не ответил: ошибка")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Не ответил за 0,3 с")).toBeInTheDocument(), { timeout: 2000 });
     expect(fast.search).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onNavigate).toHaveBeenCalledWith("/scanner/f/1");
+  });
+
+  it("зависший источник (> 3 с, сигнал отмены игнорирует) не задерживает остальные", async () => {
+    const hung = { id: "grc", title: "Аттестация", search: () => new Promise<never>(() => {}) };
+    const scanner = { id: "scanner", title: "Сканер", search: async () => [{ title: "CVE-2024-6387", link: "/scanner/f/1" }] };
+    const vm = {
+      id: "vm",
+      title: "Устранение",
+      search: () => new Promise<SearchItem[]>((r) => setTimeout(() => r([{ title: "Заявка VM-12", link: "/vm/t/12" }]), 150)),
+    };
+    render(<QuickSearch sources={[hung, scanner, vm]} />);
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    const input = await screen.findByRole("combobox", { name: "Строка поиска" });
+    const started = Date.now();
+    fireEvent.change(input, { target: { value: "cve" } });
+    expect(await screen.findByText("CVE-2024-6387")).toBeInTheDocument();
+    expect(await screen.findByText("Заявка VM-12")).toBeInTheDocument();
+    expect(Date.now() - started).toBeLessThan(3000);
+    // Пока ждём — группа зависшего продукта помечена «Ищем…», результаты остальных уже кликабельны.
+    expect(within(screen.getByRole("group", { name: "Аттестация" })).getByText("Ищем…")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Не ответил за 3 с")).toBeInTheDocument(), { timeout: 4500 });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(3000);
+    expect(screen.getByText("CVE-2024-6387")).toBeInTheDocument();
+  }, 8000);
+
+  it("группы по продуктам, стрелки и Enter, длинные заголовки и небезопасные ссылки", async () => {
+    const onNavigate = vi.fn();
+    const long = "Очень длинный заголовок находки ".repeat(8).trim();
+    const sources = [
+      {
+        id: "scanner",
+        title: "Сканер",
+        search: async () => [
+          { title: long, subtitle: "10.0.0.5", link: "/scanner/f/1" },
+          { title: "Злая ссылка", link: "javascript:alert(1)" },
+          { title: "Чужой сайт", link: "//evil.example/x" },
+        ],
+      },
+      { id: "vm", title: "Устранение", search: async () => [{ title: "Заявка VM-12", link: "/vm/t/12" }] },
+    ];
+    render(<QuickSearch sources={sources} onNavigate={onNavigate} />);
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    const input = await screen.findByRole("combobox", { name: "Строка поиска" });
+    fireEvent.change(input, { target: { value: "vm" } });
+    const vmGroup = await screen.findByRole("group", { name: "Устранение" });
+    expect(within(vmGroup).getByText("Заявка VM-12")).toBeInTheDocument();
+    const scGroup = screen.getByRole("group", { name: "Сканер" });
+    expect(within(scGroup).getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByText("Злая ссылка")).toBeNull();
+    expect(screen.queryByText("Чужой сайт")).toBeNull();
+    const text = within(scGroup).getByTitle(`${long} · 10.0.0.5`);
+    expect(text).toHaveClass("palette-item-text");
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // за концом списка — остаёмся на последней строке
+    expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onNavigate).toHaveBeenCalledWith("/vm/t/12");
   });
 
   it("команды «Перейти в…» фильтруются по вводу", async () => {
