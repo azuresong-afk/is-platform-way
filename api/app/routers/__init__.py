@@ -1,6 +1,16 @@
 """Роутеры API. Порядок подключения — в ROUTERS."""
 
-from . import admin_groups, admin_keys, admin_service_accounts, admin_users, auth, events, products, projects
+from . import (
+    admin_groups,
+    admin_keys,
+    admin_service_accounts,
+    admin_users,
+    audit,
+    auth,
+    events,
+    products,
+    projects,
+)
 
 ROUTERS: list = [
     auth,
@@ -10,5 +20,6 @@ ROUTERS: list = [
     admin_groups,
     admin_service_accounts,
     events,
+    audit,
     admin_keys,
 ]

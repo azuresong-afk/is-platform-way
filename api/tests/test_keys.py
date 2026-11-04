@@ -190,3 +190,20 @@ def test_tick_creates_key_when_none_active(client, db):
     db.commit()
     keys.tick(db)
     assert db.query(SigningKey).filter_by(status="active").count() == 1
+
+
+def test_rotations_visible_in_audit_journal(client, db):
+    from app.security import keys
+
+    h = admin(client)
+    client.post("/admin/keys/rotate", json={"mode": "scheduled"}, headers=h)
+    nxt = db.query(SigningKey).filter_by(status="next").one()
+    shift(db, nxt.kid, "created_at", 1200)
+    keys.tick(db)
+    r = client.get("/audit?action=keys.*", headers=h)
+    assert r.status_code == 200, r.text
+    rows = {x["action"]: x for x in r.json()}
+    assert set(rows) == {"keys.next_published", "keys.activated"}
+    assert rows["keys.next_published"]["actor_name"] == "Администратор платформы"
+    assert rows["keys.activated"]["actor_name"] == "Платформа (плановая ротация)"
+    assert all(x["product"] == "platform" and x["object"] == f"signing_key/{nxt.kid}" for x in rows.values())
