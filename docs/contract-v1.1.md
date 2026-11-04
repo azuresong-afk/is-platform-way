@@ -13,6 +13,7 @@
 | 2.3 | Поле `typ` и `auth_source` в токене; `kid` в заголовке обязателен | различать людей и сервисы, ротация ключей |
 | 2.4 | Правила обработки 401/403 во фронтенде и одна общая попытка refresh | несколько SPA на одном origin |
 | 3.1 | Проверка проекта: `projects` в токене — источник истины о доступе к проекту | одинаковое поведение во всех продуктах |
+| 4.1 | Сводный реестр активов: API чтения, правило слияния, `sources[]`, события `<id>.asset.*` от любого продукта | шаг 2.4; новый продукт может пополнять реестр без доработки платформы |
 | 5.1 | В манифесте новые поля: `summary_url`, `events`, `roles` включает надбавки | Главная, подписки |
 | 5.2 | Внутренний адрес манифеста для платформы | опрос без шлюза |
 | 6.1 | Подпись событий: секрет на продукт, заголовки `X-Platform-Product`, `X-Event-Id` | проверка источника |
@@ -76,6 +77,28 @@
 - Продукт пускает пользователя в проект, если `projects` содержит `"*"` или uuid проекта. Иначе — `403 {"detail":"no_project_access"}`.
 - Архивный проект доступен только на чтение; изменяющие запросы — `409 {"detail":"project_archived"}`. Статус проекта продукт берёт из `GET /api/platform/projects/{id}` (кэш до 5 мин) или из события `platform.project.updated`.
 - Продукт **не создаёт** проекты в режиме `platform`; если пришёл неизвестный ему `project` — создаёт у себя «тень» с `platform_project_id` и полями из `GET /api/platform/projects/{id}`.
+
+## 4. Активы — уточнения
+
+### 4.1. Сводный реестр
+
+**Чтение (для продуктов и оболочки).** С токеном пользователя (`aud` содержит `platform`), доступ — как к проекту (п. 3.1):
+
+- `GET /api/platform/projects/{id}/assets?q=&criticality=&os_family=&owner=&tag=&group=&source=&manual=&updated_since=&sort=&limit=&offset=` — список, всего — `X-Total-Count`. `criticality` можно повторять, `none` — не задана; `source` — id продукта, который знает об активе; `sort` — `address|hostname|owner|criticality|updated_at`, `-` в начале — по убыванию; `limit` до 500.
+- `GET /api/platform/projects/{id}/assets/facets` — значения для фильтров (теги, группы, источники, семейства ОС).
+- `GET /api/platform/assets/{id}`.
+
+Актив: `{id, project_id, address, hostname, os_family, os, owner, criticality: low|medium|high|critical|null, tags[], groups[], sources: [{product, external_id, seen_at}], manual_fields[], created_at, updated_at}`. Ключ — `(project_id, address)`; адрес нормализуется (IP — канонический вид, имя — нижний регистр).
+
+**Пополнение.**
+
+- События `<id>.asset.upserted` / `<id>.asset.deleted` от **любого** подключённого продукта (схема `data` — как у `scanner.asset.*`, п. 6.2). `project_id` в конверте обязателен. Событие с неизвестным проектом или неверным адресом принимается (202), но реестр не меняет. Событие старше уже применённого от того же продукта игнорируется.
+- `deleted` убирает только запись этого продукта из `sources[]`; актив удаляется, когда источников не осталось и ручных полей нет.
+- Ручная правка и импорт CSV — администратор платформы: `POST /projects/{id}/assets`, `PATCH /assets/{id}` (поля + `reset: [поле]` — вернуть значение из продуктов), `DELETE /assets/{id}`, `POST /projects/{id}/assets/import` (multipart `file`, `?dry_run=true` — только проверка). Источник таких изменений — `platform`.
+
+**Правило слияния.** Поле, заданное вручную или из CSV, попадает в `manual_fields` и событиями **не перетирается**. Остальные поля берутся из самого свежего события. Пустая ячейка CSV поле не меняет.
+
+**События платформы.** `platform.asset.upserted` (data — актив целиком), `platform.asset.deleted {asset_id, address}`, `platform.asset.imported {project_id, created, updated, unchanged}` — продукт может подписаться через `events.subscribe`.
 
 ## 5. Манифест — уточнения
 

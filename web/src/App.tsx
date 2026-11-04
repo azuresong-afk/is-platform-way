@@ -2,6 +2,7 @@ import { AuthProvider, Loading, useAuth } from "@platform/ui";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { ShellLayout } from "./components/ShellLayout";
+import { AssetsPage } from "./pages/admin/Assets";
 import { EventsPage } from "./pages/admin/Events";
 import { ProductsPage } from "./pages/admin/Products";
 import { ProjectsPage } from "./pages/admin/Projects";
@@ -21,6 +22,7 @@ function Authed() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/admin/users" element={<AdminOnly><UsersPage /></AdminOnly>} />
         <Route path="/admin/projects" element={<AdminOnly><ProjectsPage /></AdminOnly>} />
+        <Route path="/admin/assets" element={<AdminOnly><AssetsPage /></AdminOnly>} />
         <Route path="/admin/products" element={<AdminOnly><ProductsPage /></AdminOnly>} />
         <Route path="/admin/events" element={<AdminOnly><EventsPage /></AdminOnly>} />
         <Route path="/admin/service-accounts" element={<AdminOnly><ServiceAccountsPage /></AdminOnly>} />

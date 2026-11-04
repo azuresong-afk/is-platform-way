@@ -155,3 +155,45 @@ export function errorText(e: unknown): string {
   }
   return e instanceof Error ? e.message : "Неизвестная ошибка";
 }
+
+export type Criticality = "low" | "medium" | "high" | "critical";
+
+export interface AssetSource {
+  product: string;
+  external_id: string | null;
+  seen_at: string | null;
+}
+
+export interface Asset {
+  id: string;
+  project_id: string;
+  address: string;
+  hostname: string;
+  os_family: string;
+  os: string;
+  owner: string;
+  criticality: Criticality | null;
+  tags: string[];
+  groups: string[];
+  sources: AssetSource[];
+  manual_fields: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetFacets {
+  tags: string[];
+  groups: string[];
+  sources: string[];
+  os_families: string[];
+}
+
+export interface ImportReport {
+  dry_run: boolean;
+  rows: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  error_count: number;
+  errors: { line: number; error: string }[];
+}
