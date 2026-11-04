@@ -7,6 +7,7 @@ import {
   type FetchOptions,
   getToken,
   logout as doLogout,
+  onLogoutElsewhere,
   redirectToLogin,
   refreshOnce,
   TOKEN_EVENT,
@@ -64,6 +65,9 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
     window.addEventListener(TOKEN_EVENT, onToken);
     return () => window.removeEventListener(TOKEN_EVENT, onToken);
   }, []);
+
+  // Выход в другой вкладке — эта тоже уходит на вход.
+  useEffect(() => (requireAuth ? onLogoutElsewhere() : undefined), [requireAuth]);
 
   // Нет токена или он истёк — тихий refresh по cookie, иначе вход.
   useEffect(() => {

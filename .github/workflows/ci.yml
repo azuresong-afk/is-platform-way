@@ -89,6 +89,44 @@ jobs:
             -e TLS_KEY=/etc/nginx/tls/privkey.pem --entrypoint sh platform-gateway \
             -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t"
 
+  e2e:
+    name: e2e единого входа (Playwright на заглушках)
+    runs-on: ubuntu-latest
+    needs: [api, fakes, web]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - name: Стенд (docker compose, профиль fakes)
+        run: npm run stack:up
+      - run: npm run e2e
+        env:
+          CI: "1"
+      - name: Логи стенда
+        if: failure()
+        run: npm run stack:logs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+      - name: Остановить стенд
+        if: always()
+        run: npm run stack:down
+
   suite:
     name: Комплект — восстановление из копии на чистом стенде
     runs-on: ubuntu-latest

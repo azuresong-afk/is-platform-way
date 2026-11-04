@@ -75,6 +75,16 @@ def test_manifest_without_auth(product):
     assert c.get("/health/ready").status_code == 200
 
 
+def test_product_page_without_auth(product):
+    """Страница для e2e отдаётся без токена (вход проверяет её скрипт), без inline-скриптов под CSP."""
+    pid, c = product
+    r = c.get("/")
+    assert r.status_code == 200 and f'data-product="{pid}"' in r.text
+    assert '<script type="module" src="./app.js">' in r.text and "<script>" not in r.text
+    assert c.get("/app.js").headers["content-type"].startswith("text/javascript")
+    assert c.get("/app.css").headers["content-type"].startswith("text/css")
+
+
 def test_no_token_401_no_roles_403(product):
     pid, c = product
     assert c.get(f"/summary?project={PROJECT}").status_code == 401
