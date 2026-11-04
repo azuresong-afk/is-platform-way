@@ -4,6 +4,7 @@ from . import (
     admin_groups,
     admin_service_accounts,
     admin_users,
+    audit,
     auth,
     events,
     notifications,
@@ -19,5 +20,6 @@ ROUTERS: list = [
     admin_groups,
     admin_service_accounts,
     events,
+    audit,
     notifications,
 ]

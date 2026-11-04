@@ -6,7 +6,8 @@
 Расширение для следующих шагов (реестр активов, сводный аудит, уведомления):
 обработчик регистрируется через `on("audit.recorded")(func)` / `on("scanner.asset.*")`
 и вызывается при приёме события в той же транзакции. Исключение в обработчике
-отменяет приём (продукт получит 5xx и повторит доставку).
+отменяет приём (продукт получит 5xx и повторит доставку); `Rejected` — отказ по
+содержимому: продукт получит 422 и повторять не будет.
 """
 
 from __future__ import annotations
@@ -41,6 +42,12 @@ RETRY_MINUTES = (1, 5, 15, 60)
 TYPE_RE = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)+$")
 
 Handler = Callable[[Session, Event], None]
+
+
+class Rejected(ValueError):
+    """Обработчик отвергает событие по содержимому: приём отменяется, ответ 422."""
+
+
 _handlers: list[tuple[str, Handler]] = []
 
 
@@ -182,6 +189,8 @@ def accept_one(db: Session, product_id: str, raw: Any) -> tuple[int, dict]:
     try:
         with db.begin_nested():
             created = store(db, env)
+    except Rejected as exc:
+        return 422, {"id": str(env.id), "detail": "rejected", "errors": [str(exc)]}
     except IntegrityError:
         created = False  # параллельный приём того же id
     if not created:
