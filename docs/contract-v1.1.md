@@ -22,6 +22,7 @@
 | 7.1 | Формат ответа `search_url` | Ctrl+K |
 | 10 | **Новый пункт:** `GET /summary?project=` | Главная платформы |
 | 11 | **Новый пункт:** тема и ключи `localStorage`/`sessionStorage` | одна тема на все вкладки |
+| 9.1 | Угловатое оформление: `--radius: 4px`, `--radius-sm: 3px` | решение владельца от 04.11.2026 |
 
 ---
 
@@ -160,6 +161,12 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 
 `kind` — тип объекта на усмотрение продукта (`finding`, `run`, `ticket`, `system`, `document`, …), `severity` — необязательно.
 
+## 9. Общий UI — уточнения
+
+### 9.1. Угловатое оформление
+
+По решению владельца (04.11.2026) во всех продуктах используется угловатый вариант: в токенах `--radius: 4px` и `--radius-sm: 3px` (вместо 12px / 8px). Чипы `.chip`, счётчики `.count` и статусы `.pill` скругляются через `--radius-sm`, а не «таблеткой». Остальные токены — без изменений. Продукт, подключивший `@platform/ui`, получает это автоматически; пока пакет не подключён — правит две строки в своей копии стилей.
+
 ## 10. Сводка для Главной (новый пункт)
 
 `GET <summary_url>?project=<uuid>` с токеном пользователя, ответ за ≤ 3 с (оболочка ждёт 5 с, затем карточка «недоступен»). Общая обёртка:
@@ -198,7 +205,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 3. `GET /manifest` с полями п. 5.1, включая надбавки `cred_audit`, `host_credentials`.
 4. `GET /summary?project=` (п. 10), `GET /search` (п. 7).
 5. Outbox и отправка событий `scanner.run.finished`, `scanner.asset.upserted/deleted`, `audit.recorded` (п. 6.1–6.2).
-6. Фронтенд: `VITE_BASE=/scanner/`, `VITE_API_BASE=/api/scanner`, 401/403 по п. 2.4, ключи браузера по п. 11, `@platform/ui`.
+6. Фронтенд: `VITE_BASE=/scanner/`, `VITE_API_BASE=/api/scanner`, 401/403 по п. 2.4, ключи браузера по п. 11, `@platform/ui`; угловатые токены по п. 9.1.
 7. Для импорта в платформу: ничего; утилита платформы читает таблицы `users`, ролей и `engagements` напрямую (только чтение).
 
 ### «Устранение» (`vm`)
@@ -208,7 +215,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 4. `GET /summary` (п. 10), `GET /search`.
 5. События `vm.ticket.created/status_changed` с `notify` исполнителю, `vm.remediation.verified`, `audit.recorded`.
 6. Вызовы «Сканера» — сервисным токеном (п. 2.2) из `POST /api/platform/auth/token`, учётные данные в `.env`.
-7. Фронтенд — как у «Сканера», `VITE_BASE=/vm/`.
+7. Фронтенд — как у «Сканера», `VITE_BASE=/vm/`, угловатые токены по п. 9.1.
 
 ### «Аттестация» (`grc`)
 
@@ -216,4 +223,4 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 3. Манифест с ролями `admin, methodologist, assessor, approve, viewer`.
 4. `GET /summary` (п. 10), `GET /search`.
 5. События `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — с `notify` пользователям с ролью `approve`.
-6. Фронтенд — как у «Сканера», `VITE_BASE=/grc/`.
+6. Фронтенд — как у «Сканера», `VITE_BASE=/grc/`, угловатые токены по п. 9.1.

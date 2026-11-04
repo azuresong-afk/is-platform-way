@@ -27,7 +27,7 @@ export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref
     let cancelled = false;
     auth
       .json<TabProduct[]>(`${apiBase}/products`, { noRedirect: true })
-      .then((items) => !cancelled && setProducts(items))
+      .then((items) => !cancelled && setProducts(Array.isArray(items) ? items : []))
       .catch(() => !cancelled && setProducts([]));
     return () => {
       cancelled = true;

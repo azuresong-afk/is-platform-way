@@ -53,8 +53,10 @@
   --heat-ink-dark: #ffffff;
 
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --radius: 12px;
-  --radius-sm: 8px;
+  /* Угловатый вариант по решению владельца (04.11.2026); у «Сканера» было 12px / 8px.
+     Все скругления интерфейса выводятся из этих двух значений. */
+  --radius: 4px;
+  --radius-sm: 3px;
   --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* Пропорции по золотому сечению (φ ≈ 1,618). Отступы — ряд Фибоначчи:
@@ -849,7 +851,7 @@ small {
   height: 30px;
   padding: 0 var(--s2);
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -869,7 +871,7 @@ small {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--muted-soft);
   color: var(--text-2);
   font-size: 12px;
@@ -983,7 +985,7 @@ small {
   gap: 6px;
   height: 22px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;

@@ -1,6 +1,6 @@
 // @platform/ui — общий интерфейс «Платформы». Стили: import "@platform/ui/styles.css".
 export { AuthProvider, type AuthProviderProps, type AuthState, type AuthUser, useAuth } from "./hooks/useAuth";
-export { readProject, useProject, withProject } from "./hooks/useProject";
+export { readProject, setCurrentProject, useProject, withProject } from "./hooks/useProject";
 export { applyStoredTheme, applyTheme, readTheme, type Theme, useTheme } from "./hooks/useTheme";
 
 export {
