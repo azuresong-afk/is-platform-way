@@ -65,6 +65,20 @@ export interface AdminUser {
   groups: string[];
 }
 
+export interface ServiceAccount {
+  id: string;
+  client_id: string;
+  name: string;
+  target_product: string;
+  roles: string[];
+  all_projects: boolean;
+  projects: string[];
+  is_active: boolean;
+  created_at: string;
+  secret_rotated_at: string;
+  last_used_at: string | null;
+}
+
 export interface Member {
   user_id: string;
   username: string;

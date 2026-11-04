@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import base64
+import binascii
+from urllib.parse import unquote
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import access, audit, sessions, users
+from .. import access, audit, service_accounts, sessions, users
 from ..config import get_settings
-from ..db import get_db
+from ..db import get_db, utcnow
 from ..deps import Principal, client_ip, current_principal
 from ..models import User
 from ..security import keys
@@ -128,6 +132,85 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     db.commit()
     _set_cookie(response, issued.cookie_value)
     return out
+
+
+class ServiceTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+
+
+def _oauth_error(code: int, error: str, description: str) -> JSONResponse:
+    headers = {"Cache-Control": "no-store"}
+    if code == 401:
+        headers["WWW-Authenticate"] = 'Basic realm="platform"'
+    return JSONResponse({"error": error, "error_description": description}, status_code=code, headers=headers)
+
+
+def _basic_credentials(request: Request) -> tuple[str, str] | None:
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("basic "):
+        return None
+    try:
+        raw = base64.b64decode(auth[6:].strip(), validate=True).decode()
+    except (binascii.Error, UnicodeDecodeError):
+        return None
+    cid, sep, secret = raw.partition(":")
+    return (unquote(cid), unquote(secret)) if sep else None
+
+
+@router.post(
+    "/auth/token",
+    response_model=ServiceTokenOut,
+    responses={400: {"description": "Неверный запрос"}, 401: {"description": "Неверные учётные данные"}},
+)
+def service_token(
+    request: Request,
+    grant_type: str = Form(""),
+    client_id: str = Form("", max_length=100),
+    client_secret: str = Form("", max_length=200),
+    db: Session = Depends(get_db),
+):
+    """Токен сервисной учётной записи (контракт v1.1, п. 2.2): client credentials, без refresh."""
+    if grant_type != "client_credentials":
+        return _oauth_error(400, "unsupported_grant_type", "Поддерживается только client_credentials")
+    basic = _basic_credentials(request)
+    if basic is not None:
+        client_id, client_secret = basic
+    if not client_id or not client_secret:
+        return _oauth_error(400, "invalid_request", "Нужны client_id и client_secret")
+    ip = client_ip(request)
+    sa, err = service_accounts.authenticate(db, client_id, client_secret)
+    if err is not None or sa is None:
+        audit.record(
+            db,
+            action="auth.service_token",
+            actor_sub=f"svc:{sa.id}" if sa else None,
+            actor_name=f"svc:{client_id[:90]}",
+            result="failure" if err == service_accounts.ClientError.INVALID_CLIENT else "denied",
+            ip=ip,
+            details={"reason": err.value if err else "invalid_client"},
+        )
+        db.commit()
+        if err == service_accounts.ClientError.TARGET_UNAVAILABLE:
+            return _oauth_error(400, "invalid_target", "Целевой продукт не установлен")
+        return _oauth_error(401, "invalid_client", "Неверные учётные данные сервиса или запись отключена")
+    s = get_settings()
+    token = keys.sign(db, service_accounts.claims(db, sa))
+    sa.last_used_at = utcnow()
+    audit.record(
+        db,
+        action="auth.service_token",
+        actor_sub=f"svc:{sa.id}",
+        actor_name=f"svc:{sa.client_id}",
+        object=f"product/{sa.target_product}",
+        ip=ip,
+    )
+    db.commit()
+    return JSONResponse(
+        ServiceTokenOut(access_token=token, expires_in=s.access_ttl_seconds).model_dump(),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/auth/logout", status_code=204)

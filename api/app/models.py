@@ -199,3 +199,24 @@ class AuditLog(Base):
     ip: Mapped[str] = mapped_column(String(64), default="")
     details: Mapped[dict] = mapped_column(JsonType, default=dict)
     event_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, unique=True)
+
+
+class ServiceAccount(Base):
+    """Сервисная учётная запись: client credentials для вызовов продукт → продукт (контракт v1.1, п. 2.2)."""
+
+    __tablename__ = "service_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    client_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    # scrypt, как у паролей; сам секрет показывается один раз при выпуске
+    secret_hash: Mapped[str] = mapped_column(String(300))
+    target_product: Mapped[str] = mapped_column(String(20))
+    roles: Mapped[list] = mapped_column(JsonType, default=list)
+    all_projects: Mapped[bool] = mapped_column(Boolean, default=True)
+    projects: Mapped[list] = mapped_column(JsonType, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    secret_rotated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ShellLayout } from "./components/ShellLayout";
 import { ProductsPage } from "./pages/admin/Products";
 import { ProjectsPage } from "./pages/admin/Projects";
+import { ServiceAccountsPage } from "./pages/admin/ServiceAccounts";
 import { UsersPage } from "./pages/admin/Users";
 import { HomePage } from "./pages/Home";
 import { LoginPage } from "./pages/Login";
@@ -20,6 +21,7 @@ function Authed() {
         <Route path="/admin/users" element={<AdminOnly><UsersPage /></AdminOnly>} />
         <Route path="/admin/projects" element={<AdminOnly><ProjectsPage /></AdminOnly>} />
         <Route path="/admin/products" element={<AdminOnly><ProductsPage /></AdminOnly>} />
+        <Route path="/admin/service-accounts" element={<AdminOnly><ServiceAccountsPage /></AdminOnly>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </ShellLayout>
