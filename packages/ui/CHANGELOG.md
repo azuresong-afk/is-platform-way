@@ -6,6 +6,7 @@
 
 ### Добавлено
 - `NotificationBell`: колокольчик с числом непрочитанных и выпадающей панелью последних уведомлений (API платформы, опрос раз в минуту); `NotificationRow`, `safeLink`, `notificationsChanged`, `NOTIFICATIONS_EVENT`, тип `NotificationItem`.
+- Выход отовсюду (контракт v1.1, п. 2.4, 11): `logout()` пишет сигнал `localStorage['platform.logout']`, `AuthProvider` слушает его и уводит остальные вкладки на вход. Для своих фронтендов — `onLogoutElsewhere()` и ключ `LOGOUT_KEY`.
 
 ### Изменено
 - `PlatformTabs` рисует `NotificationBell`; проп `unread` больше не нужен и игнорируется (оставлен для совместимости).

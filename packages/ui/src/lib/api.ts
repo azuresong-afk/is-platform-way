@@ -3,7 +3,7 @@
  * Bearer из sessionStorage['platform.token'], при 401 — один общий тихий refresh на вкладку,
  * при неудаче — переход на /login?next=<текущий путь>.
  */
-import { TOKEN_KEY, safeGet, safeSet, session } from "./storage";
+import { LOGOUT_KEY, local, TOKEN_KEY, safeGet, safeSet, session } from "./storage";
 
 export const PLATFORM_API = "/api/platform";
 export const TOKEN_EVENT = "platform:token";
@@ -140,6 +140,23 @@ export async function logout(apiBase: string = PLATFORM_API): Promise<void> {
     await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "same-origin" });
   } finally {
     setToken(null);
+    // Остальные вкладки этого браузера (оболочка и продукты) уходят на вход: см. onLogoutElsewhere.
+    safeSet(local, LOGOUT_KEY, String(Date.now()));
     window.location.assign("/login");
   }
+}
+
+/**
+ * Выход в другой вкладке (контракт v1.1, п. 2.4, 11): refresh-cookie уже отозвана,
+ * но access-токен этой вкладки ещё жив — очищаем его и уходим на вход. Возвращает отписку.
+ */
+export function onLogoutElsewhere(handler: () => void = redirectToLogin): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === LOGOUT_KEY && e.newValue) {
+      setToken(null);
+      handler();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
 }

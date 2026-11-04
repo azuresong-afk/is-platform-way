@@ -81,13 +81,56 @@ jobs:
       - run: docker build --build-arg PRODUCT=fake-scanner -t fake-scanner dev
       - name: nginx -t для конфигураций без TLS и с TLS
         run: |
-          docker run --rm -e SCANNER_API_UPSTREAM=http://a:8000 -e SCANNER_WEB_UPSTREAM=http://b:8080 \
-            --entrypoint sh platform-gateway -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t"
+          # Четвёртый продукт demo подключается только переменными (roadmap §1а).
+          docker run --rm -e PLATFORM_PRODUCTS=scanner,vm,grc,demo \
+            -e SCANNER_API_UPSTREAM=http://a:8000 -e SCANNER_WEB_UPSTREAM=http://b:8080 \
+            -e SCANNER_LARGE_UPLOAD_PATHS=/feeds/bdu/upload -e DEMO_API_UPSTREAM=http://d:8000 \
+            --entrypoint sh platform-gateway -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t \
+              && grep -q 'location /api/demo/' /etc/nginx/conf.d/default.conf \
+              && grep -q 'location = /api/scanner/feeds/bdu/upload' /etc/nginx/conf.d/default.conf"
           mkdir -p tls && openssl req -x509 -newkey rsa:2048 -nodes -keyout tls/privkey.pem -out tls/fullchain.pem \
             -days 1 -subj /CN=localhost && chmod 644 tls/*.pem
           docker run --rm -v "$PWD/tls:/etc/nginx/tls:ro" -e TLS_CERT=/etc/nginx/tls/fullchain.pem \
             -e TLS_KEY=/etc/nginx/tls/privkey.pem --entrypoint sh platform-gateway \
             -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t"
+
+  e2e:
+    name: e2e единого входа (Playwright на заглушках)
+    runs-on: ubuntu-latest
+    needs: [api, fakes, web]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - name: Стенд (docker compose, профиль fakes)
+        run: npm run stack:up
+      - run: npm run e2e
+        env:
+          CI: "1"
+      - name: Логи стенда
+        if: failure()
+        run: npm run stack:logs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+      - name: Остановить стенд
+        if: always()
+        run: npm run stack:down
 
   suite:
     name: Комплект — восстановление из копии на чистом стенде

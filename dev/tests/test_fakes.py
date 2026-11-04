@@ -32,7 +32,12 @@ def _jwks() -> dict:
 
 
 def token(
-    products: dict, projects=None, aud=("scanner", "vm", "grc", "platform"), exp_in=900, key=KEY, kid=KID
+    products: dict,
+    projects=None,
+    aud=("scanner", "vm", "grc", "demo", "platform"),
+    exp_in=900,
+    key=KEY,
+    kid=KID,
 ):
     now = int(time.time())
     claims = {
@@ -59,7 +64,7 @@ def load(name: str):
     return TestClient(mod.app)
 
 
-@pytest.fixture(params=["scanner", "vm", "grc"])
+@pytest.fixture(params=["scanner", "vm", "grc", "demo"])
 def product(request):
     return request.param, load(request.param)
 
@@ -75,6 +80,16 @@ def test_manifest_without_auth(product):
     assert c.get("/health/ready").status_code == 200
 
 
+def test_product_page_without_auth(product):
+    """Страница для e2e отдаётся без токена (вход проверяет её скрипт), без inline-скриптов под CSP."""
+    pid, c = product
+    r = c.get("/")
+    assert r.status_code == 200 and f'data-product="{pid}"' in r.text
+    assert '<script type="module" src="./app.js">' in r.text and "<script>" not in r.text
+    assert c.get("/app.js").headers["content-type"].startswith("text/javascript")
+    assert c.get("/app.css").headers["content-type"].startswith("text/css")
+
+
 def test_no_token_401_no_roles_403(product):
     pid, c = product
     assert c.get(f"/summary?project={PROJECT}").status_code == 401
@@ -85,7 +100,7 @@ def test_no_token_401_no_roles_403(product):
 
 def test_summary_shape(product):
     pid, c = product
-    role = {"scanner": "auditor", "vm": "viewer", "grc": "viewer"}[pid]
+    role = {"scanner": "auditor", "vm": "viewer", "grc": "viewer", "demo": "viewer"}[pid]
     r = c.get(f"/summary?project={PROJECT}", headers=h(token({pid: [role]})))
     assert r.status_code == 200
     body = r.json()
@@ -94,12 +109,17 @@ def test_summary_shape(product):
         "scanner": {"open", "last_run"},
         "vm": {"open_tickets", "overdue_tickets", "verified_week", "next_window"},
         "grc": {"systems", "measures_percent", "documents"},
+        # Новый продукт — общий формат сводки (контракт v1.1, п. 10.1).
+        "demo": {"kpis", "note"},
     }[pid]
     assert set(body["data"]) == keys
     # Стабильно между запросами.
     assert (
         c.get(f"/summary?project={PROJECT}", headers=h(token({pid: [role]}))).json()["data"] == body["data"]
     )
+    if "kpis" in body["data"]:
+        kpis = body["data"]["kpis"]
+        assert 1 <= len(kpis) <= 6 and all({"label", "value"} <= set(k) for k in kpis)
 
 
 def test_project_access(product):
@@ -133,7 +153,7 @@ def test_invalid_tokens(product):
 
 def test_search(product):
     pid, c = product
-    q = {"scanner": "openssh", "vm": "openssh", "grc": "УПД"}[pid]
+    q = {"scanner": "openssh", "vm": "openssh", "grc": "УПД", "demo": "подключения"}[pid]
     r = c.get(f"/search?q={q}&project={PROJECT}", headers=h(token({pid: ["viewer"]})))
     items = r.json()["items"]
     assert items and all({"kind", "title", "subtitle", "link"} <= set(i) for i in items)

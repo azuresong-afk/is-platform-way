@@ -1,6 +1,7 @@
 #!/bin/sh
-# Собирает конфиг nginx шлюза из переменных окружения (контракт v1, п. 1).
-# Продукт без адреса upstream не получает маршрутов — в кабинете его просто нет.
+# Собирает конфиг nginx шлюза из переменных окружения (контракт v1, п. 1; roadmap §1а).
+# Продукты — из PLATFORM_PRODUCTS; для каждого id читаются <ID>_API_UPSTREAM, <ID>_WEB_UPSTREAM,
+# <ID>_LARGE_UPLOAD_PATHS, <ID>_LARGE_UPLOAD_MAX_BODY. Продукт без адреса API маршрутов не получает.
 set -eu
 
 OUT="${NGINX_CONF_OUT:-/etc/nginx/conf.d/default.conf}"
@@ -8,7 +9,7 @@ OUT="${NGINX_CONF_OUT:-/etc/nginx/conf.d/default.conf}"
 : "${PLATFORM_WEB_UPSTREAM:=http://platform-web:8080}"
 : "${RESOLVER:=127.0.0.11}"
 : "${CLIENT_MAX_BODY:=20m}"
-: "${BDU_UPLOAD_MAX_BODY:=512m}"
+: "${PLATFORM_PRODUCTS:=scanner,vm,grc}"
 : "${SERVER_NAME:=_}"
 : "${TLS_CERT:=}"
 : "${TLS_KEY:=}"
@@ -58,20 +59,39 @@ $(proxy_common)
 L
 }
 
-# Загрузка выгрузки БДУ ФСТЭК (vullist.xlsx): большой лимит тела, без буферизации.
-bdu_location() {
-  upstream="$1"
+# Путь с большим телом запроса (выгрузки, архивы): свой лимит, без буферизации.
+# /api/<id><path> -> <upstream><path>
+large_upload_location() {
+  id="$1"; path="$2"; upstream="$3"; max_body="$4"; v=$(var_name "/api/${id}${path}")
   cat <<L
-    location = /api/scanner/feeds/bdu/upload {
-        set \$up_bdu ${upstream};
-        rewrite ^ /feeds/bdu/upload break;
-        proxy_pass \$up_bdu;
-        client_max_body_size ${BDU_UPLOAD_MAX_BODY};
+    location = /api/${id}${path} {
+        set \$${v} ${upstream};
+        rewrite ^ ${path} break;
+        proxy_pass \$${v};
+        client_max_body_size ${max_body};
         proxy_request_buffering off;
 $(proxy_common 600s)
     }
 L
 }
+
+# Значение переменной по имени: env_value SCANNER_API_UPSTREAM.
+env_value() { eval "printf '%s' \"\${$1:-}\""; }
+
+fail() { echo "gateway: $1" >&2; exit 1; }
+
+# id продукта: строчные латинские буквы и цифры, 2–20 символов, первая — буква (как в platform-api).
+valid_id() {
+  case "$1" in
+    platform|api|admin|login|assets|fonts) return 1 ;;
+  esac
+  printf '%s' "$1" | grep -Eq '^[a-z][a-z0-9]{1,19}$'
+}
+
+PRODUCT_IDS=$(printf '%s' "$PLATFORM_PRODUCTS" | tr ',' ' ')
+for id in $PRODUCT_IDS; do
+  valid_id "$id" || fail "PLATFORM_PRODUCTS: недопустимый или зарезервированный id «${id}»"
+done
 
 {
   echo "# Сгенерировано gateway/render.sh — не править руками."
@@ -114,20 +134,27 @@ $(headers)
 S
   strip_location /api/platform/ "$PLATFORM_API_UPSTREAM"
 
-  for id in scanner vm grc; do
-    up_api=$(eval "echo \${$(echo "$id" | tr a-z A-Z)_API_UPSTREAM:-}")
-    up_web=$(eval "echo \${$(echo "$id" | tr a-z A-Z)_WEB_UPSTREAM:-}")
+  seen=" "
+  for id in $PRODUCT_IDS; do
+    case "$seen" in *" $id "*) continue ;; esac
+    seen="$seen$id "
+    ID=$(echo "$id" | tr a-z A-Z)
+    up_api=$(env_value "${ID}_API_UPSTREAM")
+    up_web=$(env_value "${ID}_WEB_UPSTREAM")
     if [ -z "$up_api" ]; then
-      echo "    # продукт ${id}: не установлен (${id}_API_UPSTREAM пуст)"
+      echo "    # продукт ${id}: не подключён (${ID}_API_UPSTREAM пуст)"
       echo "    location /api/${id}/ { return 404; }"
       echo "    location /${id}/ { return 302 /; }"
       continue
     fi
     echo "    # продукт ${id}"
-    if [ "$id" = scanner ]; then
-      # Выгрузки БДУ ФСТЭК (vullist.xlsx) большие — отдельный лимит.
-      bdu_location "$up_api"
-    fi
+    large_paths=$(env_value "${ID}_LARGE_UPLOAD_PATHS" | tr ',' ' ')
+    large_max=$(env_value "${ID}_LARGE_UPLOAD_MAX_BODY")
+    for path in $large_paths; do
+      printf '%s' "$path" | grep -Eq '^/[A-Za-z0-9._/-]+$' \
+        || fail "${ID}_LARGE_UPLOAD_PATHS: путь «${path}» должен начинаться с / и состоять из букв, цифр, . _ - /"
+      large_upload_location "$id" "$path" "$up_api" "${large_max:-512m}"
+    done
     strip_location "/api/${id}/" "$up_api"
     if [ -n "$up_web" ]; then
       strip_location "/${id}/" "$up_web"

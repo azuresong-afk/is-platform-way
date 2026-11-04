@@ -2,6 +2,8 @@
 export const TOKEN_KEY = "platform.token";
 export const PROJECT_KEY = "platform.project";
 export const THEME_KEY = "platform.theme";
+/** Сигнал выхода для других вкладок (localStorage, событие storage): значение — время выхода. */
+export const LOGOUT_KEY = "platform.logout";
 /** Прежний ключ темы «Сканера» — читается, если platform.theme ещё не задан. */
 export const LEGACY_THEME_KEY = "scanner.theme";
 

@@ -1,8 +1,9 @@
 """Реестр продуктов: какие продукты есть в установке, их манифесты и состояние.
 
-Продукт есть в установке, если задан его <ID>_API_UPSTREAM. Пока платформа не получила
-настоящий манифест (продукт ещё не поднялся), используется встроенный манифест по умолчанию
-с ролями из задания: вкладку и роли можно настраивать заранее.
+Продукт есть в установке, если его id указан в PLATFORM_PRODUCTS и задан <ID>_API_UPSTREAM.
+Пока платформа не получила настоящий манифест (продукт ещё не поднялся), используется
+встроенный манифест известного продукта или минимальная заглушка (placeholder_manifest).
+В этом модуле нет списков продуктов: всё берётся из окружения и манифестов.
 """
 
 from __future__ import annotations
@@ -15,81 +16,35 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .builtin_manifests import BUILTIN_MANIFESTS
 from .config import get_settings
 from .db import session_scope, utcnow
 from .models import Product
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MANIFESTS: dict[str, dict[str, Any]] = {
-    "scanner": {
-        "id": "scanner",
-        "title": "Сканер",
-        "subtitle": "уязвимости и соответствие",
-        "icon": "radar",
-        "base_path": "/scanner/",
-        "api_base": "/api/scanner/",
-        "version": "",
-        "roles": {
-            "admin": "Администратор",
-            "operator": "Оператор",
-            "auditor": "Аудитор",
-            "cred_audit": "Аудит паролей (надбавка)",
-            "host_credentials": "Учётные записи хостов (надбавка)",
-        },
-        "admin_roles": ["admin"],
-        "nav": [],
-        "search_url": "/api/scanner/search",
-        "health_url": "/api/scanner/health/ready",
-        "summary_url": "/api/scanner/summary",
-    },
-    "vm": {
-        "id": "vm",
-        "title": "Устранение",
-        "subtitle": "управление уязвимостями",
-        "icon": "wrench",
-        "base_path": "/vm/",
-        "api_base": "/api/vm/",
-        "version": "",
-        "roles": {
-            "admin": "Администратор",
-            "manager": "Руководитель",
-            "engineer": "Исполнитель",
-            "viewer": "Наблюдатель",
-            "remediate_execute": "Запуск исправлений (надбавка)",
-            "custom_commands": "Свои команды (надбавка)",
-        },
-        "admin_roles": ["admin"],
-        "nav": [],
-        "search_url": "/api/vm/search",
-        "health_url": "/api/vm/health/ready",
-        "summary_url": "/api/vm/summary",
-    },
-    "grc": {
-        "id": "grc",
-        "title": "Аттестация",
-        "subtitle": "ФСТЭК №117/21/239",
-        "icon": "shield-check",
-        "base_path": "/grc/",
-        "api_base": "/api/grc/",
-        "version": "",
-        "roles": {
-            "admin": "Администратор",
-            "methodologist": "Методист",
-            "assessor": "Аттестатор",
-            "approve": "Утверждение (надбавка)",
-            "viewer": "Наблюдатель",
-        },
-        "admin_roles": ["admin"],
-        "nav": [],
-        "search_url": "/api/grc/search",
-        "health_url": "/api/grc/health/ready",
-        "summary_url": "/api/grc/summary",
-    },
-}
 
-# Порядок вкладок в оболочке.
-ORDER = {"scanner": 0, "vm": 1, "grc": 2}
+def placeholder_manifest(pid: str) -> dict[str, Any]:
+    """Манифест до первого ответа продукта: встроенный, если он есть, иначе минимальный."""
+    builtin = BUILTIN_MANIFESTS.get(pid)
+    if builtin is not None:
+        return dict(builtin)
+    return {
+        "id": pid,
+        "title": pid,
+        "subtitle": "",
+        "icon": "box",
+        "base_path": f"/{pid}/",
+        "api_base": f"/api/{pid}/",
+        "version": "",
+        # Ролей нет, пока продукт не отдал манифест: выдать их заранее нельзя.
+        "roles": {},
+        "admin_roles": [],
+        "nav": [],
+        "search_url": f"/api/{pid}/search",
+        "health_url": f"/api/{pid}/health/ready",
+        "summary_url": f"/api/{pid}/summary",
+    }
 
 
 def sync_from_settings(db: Session) -> None:
@@ -99,7 +54,7 @@ def sync_from_settings(db: Session) -> None:
     for pid, cfg in configured.items():
         prod = existing.get(pid)
         if prod is None:
-            manifest = DEFAULT_MANIFESTS[pid]
+            manifest = placeholder_manifest(pid)
             prod = Product(id=pid, title=manifest["title"], manifest=manifest)
             db.add(prod)
         prod.internal_url = cfg.api_upstream
@@ -110,9 +65,23 @@ def sync_from_settings(db: Session) -> None:
     db.commit()
 
 
+def order_key(prod: Product, positions: dict[str, int]) -> tuple[float, int, str]:
+    """Порядок вкладок: число "order" из манифеста, иначе место id в PLATFORM_PRODUCTS."""
+    pos = positions.get(prod.id, len(positions))
+    order = (prod.manifest or {}).get("order")
+    if isinstance(order, bool) or not isinstance(order, int | float):
+        order = pos
+    return (float(order), pos, prod.id)
+
+
+def product_positions() -> dict[str, int]:
+    return {p.id: p.position for p in get_settings().products()}
+
+
 def enabled_products(db: Session) -> list[Product]:
     items = list(db.scalars(select(Product).where(Product.enabled.is_(True))))
-    return sorted(items, key=lambda p: ORDER.get(p.id, 99))
+    positions = product_positions()
+    return sorted(items, key=lambda p: order_key(p, positions))
 
 
 def enabled_ids(db: Session) -> list[str]:
