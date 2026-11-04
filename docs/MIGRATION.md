@@ -50,6 +50,8 @@
    Имена сервисов дальше: `scanner-app` и `scanner-web` — сетевые псевдонимы, которые видит платформа. Если compose-проект «Сканера» называется `scanner`, контейнеры доступны как `scanner-app-1` / `scanner-web-1`; задайте псевдонимы явно (`aliases: [scanner-app]`) или подставьте свои имена.
 4. **Окно работ** согласовано, пользователи предупреждены.
 
+> **Платформа установлена комплектом** (`docker-compose.suite.yml`, [`docs/INSTALL.md`](INSTALL.md), раздел «Комплект»). Тогда «Сканер» переезжает в комплект: его база создаётся в общем кластере, и данные переносятся из копии старой БД. Порядок шагов тот же, но: копию платформы на шаге 1 делает `deploy/backup.sh`; импорт (шаги 2–3) запускается из старой БД «Сканера», пока она ещё работает; на шаге 5 вместо правки `.env` «Сканера» — восстановление его копии в базу `scanner` комплекта (`pg_restore --no-owner` от пользователя `scanner`, до первого запуска `scanner-app`), затем `scanner` в `PLATFORM_PRODUCTS`, `SCANNER_IMAGE`, `SCANNER_DB_PASSWORD`, `SCANNER_EVENTS_SECRET` в `.env` комплекта и `deploy/suite.sh up -d --wait`. Откат — `deploy/restore.sh` для платформы и запуск старой установки «Сканера» как была (вариант А, пункт 1).
+
 Ниже: каталог платформы — `/opt/platform`, каталог «Сканера» — `/opt/scanner`, сервисы «Сканера» — `app`, `web`, `db`, база и её владелец — `scanner`. Подставьте свои.
 
 ## Шаг 0. Подготовка (можно накануне)
@@ -194,13 +196,16 @@ docker network disconnect platform_default $(cd /opt/scanner && docker compose p
 
 ```
 AUTH_MODE=platform
+PLATFORM_PRODUCT_ID=scanner
+PLATFORM_URL=http://platform-api:8000
 PLATFORM_JWKS_URL=http://platform-api:8000/.well-known/jwks.json
+PLATFORM_EVENTS_URL=http://platform-api:8000/events
 PLATFORM_EVENTS_SECRET=<тот же, что SCANNER_EVENTS_SECRET платформы>
 VITE_BASE=/scanner/
 VITE_API_BASE=/api/scanner
 ```
 
-Точный список переменных режима платформы — в `docs/integration/scanner.md` для вашей версии «Сканера». `VITE_*` — переменные сборки: фронтенд «Сканера» пересобирается.
+Переменные — по контракту v1.1, п. 12. `VITE_*` — переменные сборки: фронтенд «Сканера» пересобирается.
 
 ```bash
 cd /opt/scanner && docker compose up -d --build app web
@@ -238,7 +243,7 @@ cd /opt/platform && docker compose up -d platform-api gateway
 | 8 | Без токена | `curl -i https://<платформа>/api/scanner/summary` | `401` |
 | 9 | Отключённые | пользователь, отключённый в «Сканере» | войти не может |
 | 10 | Выход | меню пользователя → «Выйти» во вкладке «Сканер» | переход на `/login`, вкладки других продуктов тоже требуют входа |
-| 11 | Журнал | в БД платформы: `docker compose exec db psql -U platform -c "select time, details from audit_log where action='import.scanner'"` (экран «Журнал аудита» — после шага 2.5 плана) | запись `import.scanner` на каждый запуск с `--apply` |
+| 11 | Журнал | «Администрирование → Журнал аудита», фильтр по действию `import.scanner` | запись на каждый запуск импорта с `--apply`, с итогами в подробностях |
 | 12 | Интеграции | вызовы других систем в API «Сканера» | работают по токену сервисной учётной записи платформы |
 
 ## Шаг 7. После перехода
