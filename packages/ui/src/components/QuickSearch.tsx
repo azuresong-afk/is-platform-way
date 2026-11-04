@@ -3,6 +3,7 @@ import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState }
 import { createPortal } from "react-dom";
 
 import { isSeverity } from "../lib/severity";
+import { safeLink } from "./NotificationBell";
 import { SeverityBadge } from "./SeverityBadge";
 
 export interface SearchItem {
@@ -42,6 +43,11 @@ type SourceState = { status: "loading" } | { status: "ok"; items: SearchItem[] }
 
 type Row = { key: string; label: string; sub?: string; severity?: string; href?: string; run?: () => void; icon?: LucideIcon };
 
+function formatSeconds(ms: number): string {
+  const s = Math.round(ms / 100) / 10;
+  return `${String(s).replace(".", ",")} с`;
+}
+
 const NO_SOURCES: SearchSource[] = [];
 const NO_COMMANDS: Command[] = [];
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -80,37 +86,55 @@ export function QuickSearch({
     }
   }, [open]);
 
-  // Параллельные запросы к источникам с таймаутом и отменой при новом вводе.
+  // Параллельные запросы к источникам. У каждого свой таймаут: Promise.race не ждёт
+  // источник, который игнорирует AbortSignal, — его группа получает «не ответил»,
+  // остальные показываются, как только пришли. Новый ввод отменяет все запросы.
   useEffect(() => {
     const query = q.trim();
     if (!open || query.length < minLength || sources.length === 0) {
       setStates((prev) => (Object.keys(prev).length ? {} : prev));
       return;
     }
+    let cancelled = false;
     const controllers: AbortController[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const timer = setTimeout(() => {
       setStates(Object.fromEntries(sources.map((s) => [s.id, { status: "loading" } as SourceState])));
       for (const s of sources) {
         const ctrl = new AbortController();
         controllers.push(ctrl);
-        let timedOut = false;
-        const t = setTimeout(() => {
-          timedOut = true;
-          ctrl.abort();
-        }, timeoutMs);
-        s.search(query, ctrl.signal)
-          .then((items) => {
-            if (!ctrl.signal.aborted) setStates((prev) => ({ ...prev, [s.id]: { status: "ok", items } }));
-          })
-          .catch(() => {
-            if (timedOut || !ctrl.signal.aborted)
-              setStates((prev) => ({ ...prev, [s.id]: { status: "error", timeout: timedOut } }));
-          })
-          .finally(() => clearTimeout(t));
+        const settle = (st: SourceState) => {
+          if (!cancelled) setStates((prev) => (prev[s.id]?.status === "loading" ? { ...prev, [s.id]: st } : prev));
+        };
+        const deadline = new Promise<"timeout">((resolve) => {
+          timers.push(
+            setTimeout(() => {
+              resolve("timeout");
+              ctrl.abort();
+            }, timeoutMs),
+          );
+        });
+        let request: Promise<SearchItem[]>;
+        try {
+          request = Promise.resolve(s.search(query, ctrl.signal));
+        } catch (e) {
+          request = Promise.reject(e);
+        }
+        Promise.race([request, deadline]).then(
+          (res) =>
+            settle(
+              res === "timeout"
+                ? { status: "error", timeout: true }
+                : { status: "ok", items: Array.isArray(res) ? res : [] },
+            ),
+          () => settle({ status: "error", timeout: false }),
+        );
       }
     }, 200);
     return () => {
+      cancelled = true;
       clearTimeout(timer);
+      timers.forEach(clearTimeout);
       controllers.forEach((c) => c.abort());
     };
   }, [q, open, sources, timeoutMs, minLength]);
@@ -122,25 +146,27 @@ export function QuickSearch({
   );
 
   const groups = useMemo(() => {
-    const out: { id: string; title: string; note?: string; rows: Row[] }[] = [];
+    const out: { id: string; title: string; note?: string; failed?: string; rows: Row[] }[] = [];
     for (const s of sources) {
       const st = states[s.id];
       if (!st) continue;
       if (st.status === "loading") out.push({ id: s.id, title: s.title, note: "Ищем…", rows: [] });
       else if (st.status === "error")
-        out.push({ id: s.id, title: s.title, note: st.timeout ? "Не ответил вовремя" : "Недоступен", rows: [] });
-      else if (st.items.length)
         out.push({
           id: s.id,
           title: s.title,
-          rows: st.items.map((it, i) => ({
-            key: `${s.id}:${i}`,
-            label: it.title,
-            sub: it.subtitle,
-            severity: it.severity,
-            href: it.link,
-          })),
+          failed: st.timeout ? `Не ответил за ${formatSeconds(timeoutMs)}` : "Не ответил: ошибка",
+          rows: [],
         });
+      else {
+        const rows: Row[] = [];
+        st.items.forEach((it, i) => {
+          const href = safeLink(it?.link);
+          if (!href || typeof it.title !== "string") return;
+          rows.push({ key: `${s.id}:${i}`, label: it.title, sub: it.subtitle, severity: it.severity, href });
+        });
+        if (rows.length) out.push({ id: s.id, title: s.title, rows });
+      }
     }
     if (filteredCommands.length)
       out.push({
@@ -156,10 +182,16 @@ export function QuickSearch({
         })),
       });
     return out;
-  }, [sources, states, filteredCommands]);
+  }, [sources, states, filteredCommands, timeoutMs]);
 
   const rows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   useEffect(() => setCursor(0), [q]);
+  // Результаты приходят по частям — курсор не должен указывать за конец списка.
+  useEffect(() => setCursor((c) => Math.min(c, Math.max(rows.length - 1, 0))), [rows.length]);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector(`#palette-row-${cursor}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [cursor]);
 
   const choose = useCallback(
     (row: Row | undefined) => {
@@ -174,7 +206,7 @@ export function QuickSearch({
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setCursor((c) => Math.min(c + 1, rows.length - 1));
+      setCursor((c) => Math.min(c + 1, Math.max(rows.length - 1, 0)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setCursor((c) => Math.max(c - 1, 0));
@@ -219,13 +251,14 @@ export function QuickSearch({
                 />
                 <kbd>Esc</kbd>
               </div>
-              <div className="palette-list" id="palette-list" role="listbox">
+              <div className="palette-list" id="palette-list" role="listbox" ref={listRef}>
                 {groups.map((g) => (
                   <div key={g.id} role="group" aria-label={g.title}>
                     <div className="palette-group">
                       <span>{g.title}</span>
                       {g.note && <span>{g.note}</span>}
                     </div>
+                    {g.failed && <div className="palette-note palette-note-failed">{g.failed}</div>}
                     {g.rows.map((row) => {
                       index += 1;
                       const i = index;
@@ -242,8 +275,8 @@ export function QuickSearch({
                           onClick={() => choose(row)}
                         >
                           {Icon && <Icon size={15} aria-hidden="true" />}
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span>{row.label}</span>
+                          <span className="palette-item-text" title={row.sub ? `${row.label} · ${row.sub}` : row.label}>
+                            {row.label}
                             {row.sub && <span className="palette-item-sub"> · {row.sub}</span>}
                           </span>
                           {isSeverity(row.severity) && <SeverityBadge level={row.severity} />}

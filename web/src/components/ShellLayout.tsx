@@ -9,6 +9,7 @@ import {
   type SearchSource,
   useAuth,
   useProject,
+  withProject,
 } from "@platform/ui";
 import {
   Bell,
@@ -71,21 +72,25 @@ export function ShellLayout({ children }: { children: ReactNode }) {
     }
   }, [loaded, projects, projectId, setProject]);
 
+  // Источники Ctrl+K — из манифестов (search_url), только продукты, где у пользователя есть роли.
+  // Списка продуктов в коде нет: новый продукт с search_url попадает в поиск сам.
   const sources = useMemo<SearchSource[]>(
     () =>
       products
-        .filter((p) => p.search_url)
+        .filter((p, i, all) => p.search_url && p.my_roles?.length && all.findIndex((x) => x.id === p.id) === i)
         .map((p) => ({
           id: p.id,
           title: p.title,
           search: async (q: string, signal: AbortSignal) => {
             const params = new URLSearchParams({ q, limit: "8" });
             if (projectId) params.set("project", projectId);
-            const body = await auth.json<{ items: SearchItem[] }>(`${p.search_url}?${params}`, {
+            const body = await auth.json<{ items?: SearchItem[] }>(`${p.search_url}?${params}`, {
               signal,
               noRedirect: true,
             });
-            return body.items ?? [];
+            const items = Array.isArray(body?.items) ? body.items : [];
+            // Ссылки результатов несут текущий проект (контракт v1, п. 7).
+            return items.map((it) => ({ ...it, link: typeof it.link === "string" ? withProject(it.link, projectId) : it.link }));
           },
         })),
     [products, projectId, auth],

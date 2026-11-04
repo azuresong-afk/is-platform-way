@@ -1,5 +1,5 @@
 import { AuthProvider } from "@platform/ui";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -153,5 +153,45 @@ describe("Вход", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Неверный логин или пароль");
     await userEvent.click(screen.getByRole("button", { name: "Войти" }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
+  });
+});
+
+describe("Ctrl+K по продуктам", () => {
+  it("опрашивает только продукты с ролями, передаёт ?project= и сохраняет его в ссылках", async () => {
+    const json = (body: unknown) =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } }));
+    const products = [
+      { ...PRODUCTS[0] },
+      { ...PRODUCTS[1], search_url: "/api/vm/search", health: "ok" },
+      // Продукт с поиском, но без ролей у пользователя: в поиск не попадает.
+      { id: "demo", title: "Демо", icon: "box", base_path: "/demo/", summary_url: "/api/demo/summary", search_url: "/api/demo/search", health: "ok", my_roles: [] },
+    ];
+    const fetchMock = mockApi({
+      "/api/platform/products": () => json(products),
+      "/api/scanner/search": () => json({ items: [{ title: "CVE-2024-6387", subtitle: "10.0.0.5", link: "/scanner/findings/1", severity: "critical" }] }),
+      "/api/vm/search": () => json({ items: [{ title: "Заявка VM-12", link: `/vm/tickets/12?project=other#log` }] }),
+      "/api/demo/search": () => json({ items: [{ title: "Не должно быть", link: "/demo/x" }] }),
+    });
+    renderHome();
+    await waitFor(() => expect(window.localStorage.getItem("platform.project")).toBe(P1));
+    await userEvent.keyboard("{Control>}k{/Control}");
+    const input = await screen.findByRole("combobox", { name: "Строка поиска" });
+    await userEvent.type(input, "cve");
+    const scanner = await screen.findByRole("group", { name: "Сканер" });
+    const vm = await screen.findByRole("group", { name: "Устранение" });
+    expect(within(scanner).getByText("CVE-2024-6387")).toBeInTheDocument();
+    expect(within(vm).getByText("Заявка VM-12")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Демо" })).toBeNull();
+
+    const searchUrls = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("/search"));
+    expect(searchUrls.some((u) => u.startsWith("/api/demo/"))).toBe(false);
+    for (const u of searchUrls) expect(new URL(u, "http://x").searchParams.get("project")).toBe(P1);
+
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign, href: window.location.href });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(assign).toHaveBeenCalledWith(`/vm/tickets/12?project=${P1}#log`);
+    vi.unstubAllGlobals();
   });
 });
