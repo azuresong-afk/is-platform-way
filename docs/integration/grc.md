@@ -13,7 +13,7 @@
 | 3 | `GET /manifest` с ролями `admin, methodologist, assessor, approve, viewer` | экран «Продукты» платформы |
 | 4 | `GET /summary`, `GET /search` | Главная и Ctrl+K |
 | 5 | Outbox и события `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — с `notify` | `vectors/hmac.json`, `vectors/events.json` |
-| 6 | Фронтенд: `VITE_BASE=/grc/`, `VITE_API_BASE=/api/grc`, 401/403, `@platform/ui`, угловатые токены | стенд платформы |
+| 6 | Фронтенд: `VITE_BASE=/grc/`, `VITE_API_BASE=/api/grc`, 401/403, выход отовсюду (`platform.logout`), `@platform/ui`, угловатые токены | стенд платформы |
 | 7 | (необязательно) подписка на `scanner.run.finished` и чтение соответствия из «Сканера» сервисным токеном | `vectors/hmac.json` |
 
 ## 1. Вход, права, проекты
@@ -97,7 +97,7 @@
 
 ## 6. Фронтенд
 
-`VITE_BASE=/grc/ VITE_API_BASE=/api/grc VITE_PLATFORM=1`; 401/403/выход — README, п. 8.
+`VITE_BASE=/grc/ VITE_API_BASE=/api/grc VITE_PLATFORM=1`; 401/403/выход — README, п. 8, включая «выход отовсюду»: вкладка продукта слушает `storage` по ключу `platform.logout` и уходит на `/login` (с `@platform/ui` — `AuthProvider`).
 
 ## 7. Проверка
 

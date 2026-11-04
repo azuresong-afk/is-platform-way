@@ -180,12 +180,13 @@ X-Signature: sha256=<hex HMAC-SHA256(тело, PLATFORM_EVENTS_SECRET)>
 | Токен | `sessionStorage['platform.token']`; заголовок `Authorization: Bearer …` |
 | 401 | один общий на вкладку `POST /api/platform/auth/refresh` (`credentials: "same-origin"`), новый токен — в `platform.token`, повтор запроса; refresh вернул 401 — очистить токен и `location = "/login?next=" + encodeURIComponent(путь + query)` |
 | 403 `no_product_roles` | экран «Нет доступа к продукту» со ссылкой на `/`, без refresh |
-| Выход | `POST /api/platform/auth/logout`, очистить `platform.token`, перейти на `/login` |
+| Выход | `POST /api/platform/auth/logout`, очистить `platform.token`, записать `localStorage['platform.logout'] = Date.now()`, перейти на `/login` |
+| Выход в другой вкладке | слушать `storage` по ключу `platform.logout`: очистить свой `platform.token` и перейти на `/login?next=<путь с query>`. Без этого открытые вкладки работают до истечения access-токена (15 мин), хотя refresh уже отозван. В `@platform/ui` это делают `logout()` и `AuthProvider` (`onLogoutElsewhere`) |
 | Проект | `localStorage['platform.project']` + `?project=` в адресе; слушать событие `storage` |
 | Тема | `localStorage['platform.theme']` (`dark`/`light`), при чтении учитывать старый `scanner.theme`; слушать `storage` |
 | Стили | `@platform/ui` (`import "@platform/ui/styles.css"`); пока пакет не подключён — своя копия стилей «Сканера» с `--radius: 4px`, `--radius-sm: 3px` (п. 9.1) |
 
-Своей страницы входа в режиме `platform` у продукта нет. Хуки `useTheme` и `useProject` из `@platform/ui` уже делают синхронизацию через `storage`.
+Своей страницы входа в режиме `platform` у продукта нет. Хуки `useTheme` и `useProject` и `AuthProvider` из `@platform/ui` уже делают синхронизацию через `storage`.
 
 ## 9. Тестовые векторы
 
@@ -244,5 +245,5 @@ def test_platform_jwt(client_with_jwks, case):
 - [ ] Outbox: событие пишется в одной транзакции с изменением, доставка переживает рестарт, повторы 1/5/15/60.
 - [ ] Каждая запись своего журнала аудита уходит событием `audit.recorded`.
 - [ ] Подписка на `platform.keys.rotated` и `platform.project.updated`; непустой `revoked` сбрасывает кэш JWKS.
-- [ ] Фронтенд собран с `VITE_BASE=/<id>/`, `VITE_API_BASE=/api/<id>`, `VITE_PLATFORM=1`; 401/403/выход по п. 2.4.
-- [ ] На стенде платформы (`docker compose up` с upstream вашего продукта вместо заглушки): вход в оболочке открывает продукт без повторного входа; пользователь без ролей не видит вкладку и получает 403 от API; карточка на Главной заполнена.
+- [ ] Фронтенд собран с `VITE_BASE=/<id>/`, `VITE_API_BASE=/api/<id>`, `VITE_PLATFORM=1`; 401/403/выход по п. 2.4, включая «выход отовсюду» по сигналу `platform.logout`.
+- [ ] На стенде платформы (`docker compose up` с upstream вашего продукта вместо заглушки): вход в оболочке открывает продукт без повторного входа; выход в любой вкладке сразу уводит на вход все вкладки продукта; пользователь без ролей не видит вкладку и получает 403 от API; карточка на Главной заполнена.

@@ -14,7 +14,7 @@
 | 4 | `GET /summary`, `GET /search` | Главная и Ctrl+K платформы |
 | 5 | Outbox и события `scanner.run.finished`, `scanner.asset.upserted/deleted`, `audit.recorded` | `vectors/hmac.json`, экран «События» платформы |
 | 6 | Webhook `/events/platform`, подписка на `vm.remediation.verified` | `vectors/hmac.json` (`platform_to_subscriber`) |
-| 7 | Фронтенд: `VITE_BASE=/scanner/`, `VITE_API_BASE=/api/scanner`, 401/403 по п. 2.4, `@platform/ui`, угловатые токены | стенд платформы |
+| 7 | Фронтенд: `VITE_BASE=/scanner/`, `VITE_API_BASE=/api/scanner`, 401/403, выход отовсюду (`platform.logout`) по п. 2.4, `@platform/ui`, угловатые токены | стенд платформы |
 
 ## 1. Вход и права
 
@@ -120,7 +120,7 @@ Authorization: Bearer <токен пользователя>
 
 ## 7. Фронтенд
 
-Сборка для платформы: `VITE_BASE=/scanner/ VITE_API_BASE=/api/scanner VITE_PLATFORM=1`. Страница входа в режиме `platform` не используется; 401/403/выход — README, п. 8. Ключ темы `scanner.theme` переходит в `platform.theme` (читать оба, писать новый). Стили — `@platform/ui` или своя копия с `--radius: 4px`, `--radius-sm: 3px`; `.chip`, `.count`, `.pill` — через `--radius-sm`.
+Сборка для платформы: `VITE_BASE=/scanner/ VITE_API_BASE=/api/scanner VITE_PLATFORM=1`. Страница входа в режиме `platform` не используется; 401/403/выход — README, п. 8, включая «выход отовсюду»: вкладка продукта слушает `storage` по ключу `platform.logout` и уходит на `/login` (с `@platform/ui` — `AuthProvider`). Ключ темы `scanner.theme` переходит в `platform.theme` (читать оба, писать новый). Стили — `@platform/ui` или своя копия с `--radius: 4px`, `--radius-sm: 3px`; `.chip`, `.count`, `.pill` — через `--radius-sm`.
 
 ## 8. Проверка
 

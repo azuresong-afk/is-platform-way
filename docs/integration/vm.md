@@ -15,7 +15,7 @@
 | 5 | Outbox и события `vm.ticket.created/status_changed` (с `notify`), `vm.remediation.verified`, `audit.recorded` | `vectors/hmac.json`, `vectors/events.json` |
 | 6 | Вызовы «Сканера» сервисным токеном из `POST /api/platform/auth/token` | вектор `service_vm_to_scanner` |
 | 7 | Webhook `/events/platform` для событий «Сканера» | `vectors/hmac.json` |
-| 8 | Фронтенд: `VITE_BASE=/vm/`, `VITE_API_BASE=/api/vm`, 401/403, `@platform/ui`, угловатые токены | стенд платформы |
+| 8 | Фронтенд: `VITE_BASE=/vm/`, `VITE_API_BASE=/api/vm`, 401/403, выход отовсюду (`platform.logout`), `@platform/ui`, угловатые токены | стенд платформы |
 
 ## 1. Вход, права, проекты
 
@@ -134,7 +134,7 @@ Webhook `POST /events/platform` (README, п. 7.2). Что делать:
 
 ## 7. Фронтенд
 
-`VITE_BASE=/vm/ VITE_API_BASE=/api/vm VITE_PLATFORM=1`; 401/403/выход — README, п. 8. Ссылки на «Сканер» (например, «Открыть находку») — `/scanner/findings/<id>?project=<uuid>`: тот же origin, переход без повторного входа.
+`VITE_BASE=/vm/ VITE_API_BASE=/api/vm VITE_PLATFORM=1`; 401/403/выход — README, п. 8, включая «выход отовсюду»: вкладка продукта слушает `storage` по ключу `platform.logout` и уходит на `/login` (с `@platform/ui` — `AuthProvider`). Ссылки на «Сканер» (например, «Открыть находку») — `/scanner/findings/<id>?project=<uuid>`: тот же origin, переход без повторного входа.
 
 ## 8. Проверка
 
