@@ -135,6 +135,8 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 
 Дополнительные поля в `data` допустимы и сохраняются.
 
+`audit.recorded` попадает в сводный журнал платформы (`audit_log`, поле `product` = `source`). Обязательно только `action` (непустая строка); `result` — одно из `success|failure|denied` (по умолчанию `success`); `time` — с часовым поясом (если нет — берётся `time` конверта); `actor` можно не передавать (системное действие); `details` — объект. Длинные строки обрезаются по размерам столбцов: `actor.sub` 100, `actor.name` 200, `action` 100, `object` 300, `ip` 64. Запись не по этим правилам — `422 {"detail":"rejected"}`, событие не сохраняется (повторять бессмысленно, как и при ошибке конверта).
+
 Платформа сама публикует: `platform.project.updated {project_id, name, status}`, `platform.user.blocked {sub}`, `platform.keys.rotated {kid}`.
 
 ### 6.3. Поле `notify`

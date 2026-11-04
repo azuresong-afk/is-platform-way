@@ -79,6 +79,29 @@ export interface ServiceAccount {
   last_used_at: string | null;
 }
 
+export interface AuditEntry {
+  id: number;
+  time: string;
+  product: string;
+  product_title: string;
+  actor_sub: string | null;
+  actor_name: string;
+  action: string;
+  object: string;
+  project_id: string | null;
+  project_name: string | null;
+  result: string;
+  ip: string;
+  details: Record<string, unknown>;
+  event_id: string | null;
+}
+
+export interface AuditFacets {
+  products: { id: string; title: string }[];
+  projects: { id: string; title: string }[];
+  actions: string[];
+}
+
 export type DeliveryStatus = "ok" | "pending" | "failed" | "dead";
 
 export interface BusEvent {
