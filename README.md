@@ -2,7 +2,7 @@
 
 Единый кабинет для продуктов «Сканер» (`scanner`), «Устранение» (`vm`) и «Аттестация» (`grc`): один вход, пользователи и доступ, проекты, сводный реестр активов, шина событий, сводный журнал аудита, общая оболочка интерфейса и пакет `@platform/ui`.
 
-План работ — [docs/roadmap.md](docs/roadmap.md). Изменения контракта — [docs/contract-v1.1.md](docs/contract-v1.1.md). Исходное задание — [docs/spec/03-platforma.md](docs/spec/03-platforma.md).
+План работ — [docs/roadmap.md](docs/roadmap.md). Изменения контракта — [docs/contract-v1.1.md](docs/contract-v1.1.md). Исходное задание — [docs/spec/03-platforma.md](docs/spec/03-platforma.md). Интеграция продуктов и тестовые векторы — [docs/integration/](docs/integration/README.md).
 
 ## Состав репозитория
 
@@ -13,7 +13,7 @@
 | `packages/ui/` | Пакет `@platform/ui`: токены, стили, шрифты, компоненты оболочки |
 | `gateway/` | Шлюз nginx: маршруты `/api/<id>/`, `/<id>/`, CSP, TLS |
 | `dev/` | Заглушки продуктов `fake-scanner`, `fake-vm`, `fake-grc` для разработки |
-| `docs/` | Дорожная карта, контракт v1.1, установка, проверка |
+| `docs/` | Дорожная карта, контракт v1.1, интеграция продуктов (`integration/`), установка, проверка |
 
 ## Быстрый запуск (Docker)
 

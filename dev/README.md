@@ -21,4 +21,4 @@ PLATFORM_JWKS_URL=http://127.0.0.1:18010/.well-known/jwks.json \
 
 Переменные: `PLATFORM_JWKS_URL`, `PLATFORM_EVENTS_SECRET`, `FAKE_DELAY_SECONDS` (задержка `/summary` и `/search`), `FAKE_FAIL=1` (ответ 500 — проверка карточки «недоступен»).
 
-Тесты: `cd dev && pytest`.
+Тесты: `cd dev && pytest` (в том числе эталонная проверка токена на векторах `docs/integration/vectors/`).
