@@ -93,3 +93,12 @@ jobs:
           docker run --rm -v "$PWD/tls:/etc/nginx/tls:ro" -e TLS_CERT=/etc/nginx/tls/fullchain.pem \
             -e TLS_KEY=/etc/nginx/tls/privkey.pem --entrypoint sh platform-gateway \
             -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t"
+
+  suite:
+    name: Комплект — восстановление из копии на чистом стенде
+    runs-on: ubuntu-latest
+    needs: [images]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: dev/suite-restore-check.sh
