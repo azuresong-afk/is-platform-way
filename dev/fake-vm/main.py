@@ -32,7 +32,15 @@ MANIFEST = {
     "search_url": "/api/vm/search",
     "health_url": "/api/vm/health/ready",
     "summary_url": "/api/vm/summary",
-    "events": {"webhook": "/events/platform", "subscribe": ["scanner.run.finished", "scanner.asset.*"]},
+    "events": {
+        "webhook": "/events/platform",
+        "subscribe": [
+            "scanner.run.finished",
+            "scanner.asset.*",
+            "platform.keys.rotated",
+            "platform.project.updated",
+        ],
+    },
 }
 
 

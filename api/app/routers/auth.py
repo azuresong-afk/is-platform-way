@@ -219,7 +219,14 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
     rec, ok = sessions.find(db, request.cookies.get(s.refresh_cookie_name))
     if rec is not None and ok:
         sessions.revoke_family(db, rec.family_id, "logout")
-        audit.record(db, action="auth.logout", actor_sub=str(rec.user_id), ip=client_ip(request))
+        user = db.get(User, rec.user_id)
+        audit.record(
+            db,
+            action="auth.logout",
+            actor_sub=str(rec.user_id),
+            actor_name=user.display_name if user else None,
+            ip=client_ip(request),
+        )
         db.commit()
     response.status_code = 204
     _clear_cookie(response)

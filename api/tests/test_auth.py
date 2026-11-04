@@ -114,13 +114,16 @@ def test_refresh_garbage_cookie(client):
     assert client.post("/auth/refresh").status_code == 401
 
 
-def test_logout_revokes_refresh(client):
+def test_logout_revokes_refresh(client, db):
     _, c1 = login(client)
     client.cookies.clear()
     r = client.post("/auth/logout", headers={"cookie": f"platform_refresh={c1}"})
     assert r.status_code == 204
     assert 'platform_refresh=""' in r.headers["set-cookie"] or "Max-Age=0" in r.headers["set-cookie"]
     assert do_refresh(client, c1).status_code == 401
+    # В журнале аудита видно, кто вышел, а не только sub.
+    row = db.query(AuditLog).filter_by(action="auth.logout").one()
+    assert row.actor_sub and row.actor_name
 
 
 @pytest.mark.parametrize("how", ["deactivate", "lock"])

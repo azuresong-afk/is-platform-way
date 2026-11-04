@@ -18,6 +18,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["src/test-setup.ts"],
-    css: false,
+    // CSS не обрабатываем; styles.css нужен только как текст стражу токенов (src/tokens.test.ts).
+    css: { include: [/styles\.css/] },
   },
 });

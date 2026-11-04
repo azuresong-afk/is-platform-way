@@ -4,6 +4,8 @@
 const TOKEN_KEY = "platform.token";
 const PROJECT_KEY = "platform.project";
 const LOGOUT_KEY = "platform.logout";
+const THEME_KEY = "platform.theme";
+const LEGACY_THEME_KEY = "scanner.theme";
 const PLATFORM_API = "/api/platform";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -83,12 +85,20 @@ async function logout() {
   }
 }
 
-// Выход в другой вкладке — эта вкладка тоже уходит на вход.
+// Тема — как useTheme из @platform/ui (контракт v1.1, п. 11): platform.theme, иначе scanner.theme, иначе тёмная.
+function applyTheme() {
+  const saved = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
+  document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+}
+applyTheme();
+
+// Выход в другой вкладке — эта вкладка тоже уходит на вход; смена темы там — меняет тему здесь.
 window.addEventListener("storage", (e) => {
   if (e.key === LOGOUT_KEY && e.newValue) {
     sessionStorage.removeItem(TOKEN_KEY);
     toLogin();
   }
+  if (e.key === THEME_KEY) applyTheme();
 });
 
 async function main() {

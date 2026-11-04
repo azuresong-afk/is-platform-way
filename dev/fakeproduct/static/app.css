@@ -1,9 +1,11 @@
-body { font-family: system-ui, sans-serif; margin: 0; background: #0f1115; color: #e6e8ee; }
-.tabs { display: flex; gap: 4px; padding: 8px 16px; background: #161a22; }
-.tabs a { color: #aab1c0; text-decoration: none; padding: 6px 10px; border-radius: 3px; }
-.tabs a[aria-current="page"] { background: #2a3140; color: #fff; }
+:root { --bg: #0b0f14; --sidebar: #0f141b; --text: #e6eaf0; --text-3: #7d8794; --tab: #a3adbb; --tab-active: #18202b; }
+:root[data-theme="light"] { --bg: #f5f6f8; --sidebar: #ffffff; --text: #0f172a; --text-3: #64748b; --tab: #475569; --tab-active: #eaf1ff; }
+body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+.tabs { display: flex; gap: 4px; padding: 8px 16px; background: var(--sidebar); }
+.tabs a { color: var(--tab); text-decoration: none; padding: 6px 10px; border-radius: 3px; }
+.tabs a[aria-current="page"] { background: var(--tab-active); color: var(--text); }
 main { padding: 16px; }
-.note { color: #8a93a6; }
-dt { color: #8a93a6; margin-top: 8px; }
+.note { color: var(--text-3); }
+dt { color: var(--text-3); margin-top: 8px; }
 dd { margin: 0; font-family: ui-monospace, monospace; }
 button { margin-top: 16px; padding: 6px 12px; border-radius: 3px; }

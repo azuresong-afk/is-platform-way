@@ -203,3 +203,45 @@ def test_jwks_refetch_on_unknown_kid():
     cache._fetched_at -= 31
     cache.get("other")
     assert len(calls) == 2
+
+
+def test_keys_rotated_event_resets_jwks_cache():
+    calls = []
+
+    def fetch():
+        calls.append(1)
+        return _jwks()
+
+    cache = JwksCache("x", fetch=fetch)
+    assert cache.get(KID) is not None and len(calls) == 1
+    # Новый ключ: перечитать JWKS сразу, не дожидаясь 30 с.
+    cache.rotated("new-key", [])
+    cache.get("new-key")
+    assert len(calls) == 2
+    # Известный ключ без отзыва — кэш не трогаем.
+    cache.rotated(KID, [])
+    cache.get(KID)
+    assert len(calls) == 2
+    # Отозванный kid не принимается, даже если JWKS его ещё отдаёт.
+    cache.rotated("new-key", [KID])
+    assert cache.get(KID) is None and len(calls) == 3
+
+
+def test_keys_rotated_webhook(monkeypatch):
+    c = load("vm")
+    monkeypatch.setenv("PLATFORM_EVENTS_SECRET", "s3cret")
+    viewer = token({"vm": ["viewer"]})
+    assert c.get("/me", headers=h(viewer)).status_code == 200
+    ev = {
+        "id": str(uuid.uuid4()),
+        "type": "platform.keys.rotated",
+        "source": "platform",
+        "time": "2026-11-04T16:54:52Z",
+        "project_id": None,
+        "subject": "keys",
+        "data": {"kid": "next-key", "revoked": [KID]},
+    }
+    body = json.dumps(ev).encode()
+    sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    assert c.post("/events/platform", content=body, headers={"x-signature": sig}).status_code == 202
+    assert c.get("/me", headers=h(viewer)).status_code == 401

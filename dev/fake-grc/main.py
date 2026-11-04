@@ -31,7 +31,10 @@ MANIFEST = {
     "search_url": "/api/grc/search",
     "health_url": "/api/grc/health/ready",
     "summary_url": "/api/grc/summary",
-    "events": {"webhook": "/events/platform", "subscribe": ["scanner.run.finished"]},
+    "events": {
+        "webhook": "/events/platform",
+        "subscribe": ["scanner.run.finished", "platform.keys.rotated", "platform.project.updated"],
+    },
 }
 
 

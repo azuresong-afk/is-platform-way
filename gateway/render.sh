@@ -164,6 +164,12 @@ S
 
   cat <<S
 
+    # Любой другой /api/… — продукт не установлен или адрес неизвестен: 404, а не страница оболочки с кодом 200.
+    location /api/ {
+        default_type application/json;
+        return 404 '{"detail":"not_found"}';
+    }
+
     location / {
         set \$up_web ${PLATFORM_WEB_UPSTREAM};
         proxy_pass \$up_web;
