@@ -245,3 +245,12 @@ export interface ImportReport {
   error_count: number;
   errors: { line: number; error: string }[];
 }
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string;
+  members: string[];
+  roles: Record<string, string[]>;
+  projects: string[];
+}

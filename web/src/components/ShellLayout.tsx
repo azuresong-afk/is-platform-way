@@ -23,6 +23,7 @@ import {
   Server,
   ScrollText,
   Users,
+  UsersRound,
 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
@@ -104,6 +105,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
     if (auth.isPlatformAdmin) {
       list.push(
         { id: "go-users", label: "Перейти в Пользователи и доступ", href: "/admin/users" },
+        { id: "go-groups", label: "Перейти в Команды", href: "/admin/groups" },
         { id: "go-projects", label: "Перейти в Проекты", href: "/admin/projects" },
         { id: "go-assets", label: "Перейти в Реестр активов", href: "/admin/assets" },
         { id: "go-audit", label: "Перейти в Журнал аудита", href: "/admin/audit" },
@@ -118,6 +120,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
   const adminNav = auth.isPlatformAdmin
     ? [
         { to: "/admin/users", label: "Пользователи и доступ", icon: Users },
+        { to: "/admin/groups", label: "Команды", icon: UsersRound },
         { to: "/admin/projects", label: "Проекты", icon: FolderKanban },
         { to: "/admin/assets", label: "Реестр активов", icon: Server },
         { to: "/admin/products", label: "Продукты", icon: Boxes },
