@@ -39,7 +39,7 @@ cd api && pip install -e ".[dev]"
 export DATABASE_URL=postgresql+psycopg://user:pass@127.0.0.1:5432/platform
 export PLATFORM_SECRET_KEY=$(openssl rand -base64 32) COOKIE_SECURE=false
 export BOOTSTRAP_ADMIN_USERNAME=admin BOOTSTRAP_ADMIN_PASSWORD=...
-export SCANNER_API_UPSTREAM=http://127.0.0.1:18000 VM_API_UPSTREAM=http://127.0.0.1:18001 GRC_API_UPSTREAM=http://127.0.0.1:18002
+export PLATFORM_PRODUCTS=scanner,vm,grc SCANNER_API_UPSTREAM=http://127.0.0.1:18000 VM_API_UPSTREAM=http://127.0.0.1:18001 GRC_API_UPSTREAM=http://127.0.0.1:18002
 alembic upgrade head
 uvicorn app.main:create_app --factory --port 18010
 

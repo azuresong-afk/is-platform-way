@@ -13,6 +13,7 @@ from .models import GroupMember, GroupProductRole, GroupProject, ProjectMember, 
 
 def effective_roles(db: Session, user: User) -> dict[str, list[str]]:
     # Роль, исчезнувшая из манифеста продукта, в токен не попадает.
+    # Порядок словаря — порядок вкладок.
     allowed = {p.id: set((p.manifest or {}).get("roles") or {}) for p in products.enabled_products(db)}
     out: dict[str, set[str]] = {}
     own = db.execute(
@@ -26,9 +27,7 @@ def effective_roles(db: Session, user: User) -> dict[str, list[str]]:
     for pid, role in [*own, *via_groups]:
         if role in allowed.get(pid, ()):
             out.setdefault(pid, set()).add(role)
-    return {
-        pid: sorted(roles) for pid, roles in sorted(out.items(), key=lambda kv: products.ORDER.get(kv[0], 99))
-    }
+    return {pid: sorted(out[pid]) for pid in allowed if pid in out}
 
 
 def effective_projects(db: Session, user: User) -> list[str]:

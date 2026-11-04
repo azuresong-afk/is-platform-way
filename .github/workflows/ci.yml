@@ -81,8 +81,13 @@ jobs:
       - run: docker build --build-arg PRODUCT=fake-scanner -t fake-scanner dev
       - name: nginx -t для конфигураций без TLS и с TLS
         run: |
-          docker run --rm -e SCANNER_API_UPSTREAM=http://a:8000 -e SCANNER_WEB_UPSTREAM=http://b:8080 \
-            --entrypoint sh platform-gateway -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t"
+          # Четвёртый продукт demo подключается только переменными (roadmap §1а).
+          docker run --rm -e PLATFORM_PRODUCTS=scanner,vm,grc,demo \
+            -e SCANNER_API_UPSTREAM=http://a:8000 -e SCANNER_WEB_UPSTREAM=http://b:8080 \
+            -e SCANNER_LARGE_UPLOAD_PATHS=/feeds/bdu/upload -e DEMO_API_UPSTREAM=http://d:8000 \
+            --entrypoint sh platform-gateway -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t \
+              && grep -q 'location /api/demo/' /etc/nginx/conf.d/default.conf \
+              && grep -q 'location = /api/scanner/feeds/bdu/upload' /etc/nginx/conf.d/default.conf"
           mkdir -p tls && openssl req -x509 -newkey rsa:2048 -nodes -keyout tls/privkey.pem -out tls/fullchain.pem \
             -days 1 -subj /CN=localhost && chmod 644 tls/*.pem
           docker run --rm -v "$PWD/tls:/etc/nginx/tls:ro" -e TLS_CERT=/etc/nginx/tls/fullchain.pem \
