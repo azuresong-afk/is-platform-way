@@ -16,6 +16,7 @@ import {
   Boxes,
   FolderKanban,
   KeyRound,
+  KeySquare,
   LayoutDashboard,
   Layers3,
   Radio,
@@ -123,6 +124,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         { to: "/admin/events", label: "События", icon: Radio },
         { to: "/admin/service-accounts", label: "Сервисные учётные записи", icon: KeyRound },
         { to: "/admin/audit", label: "Журнал аудита", icon: ScrollText },
+        { to: "/admin/keys", label: "Ключи подписи", icon: KeySquare },
       ]
     : [];
 

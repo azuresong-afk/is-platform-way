@@ -50,6 +50,9 @@ services:
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Администратор платформы}
       LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-5}
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+      KEY_ROTATION_DAYS: ${KEY_ROTATION_DAYS:-90}
+      KEY_NEXT_LEAD_SECONDS: ${KEY_NEXT_LEAD_SECONDS:-1200}
+      JWKS_RETAIN_SECONDS: ${JWKS_RETAIN_SECONDS:-1800}
     ports:
       - "127.0.0.1:${PLATFORM_API_PORT:-18010}:8000"
     logging: *logging
@@ -112,6 +115,23 @@ services:
     environment:
       PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
       PLATFORM_EVENTS_SECRET: ${DEMO_EVENTS_SECRET:-}
+    logging: *logging
+
+  # --- учебная БД «Сканера» до перехода (профиль migration, docs/MIGRATION.md) ---
+  scanner-legacy-db:
+    profiles: [migration]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: scanner
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner-legacy-pass
+    volumes:
+      - ./dev/scanner-legacy/seed.sql:/docker-entrypoint-initdb.d/10-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner -d scanner"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     logging: *logging
 
 volumes:

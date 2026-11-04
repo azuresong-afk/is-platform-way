@@ -99,6 +99,7 @@ class Report:
 @dataclass
 class SourceUser:
     source_id: str
+    raw_id: Any
     username: str
     display_name: str
     email: str | None
@@ -251,6 +252,7 @@ def read_source(
         users.append(
             SourceUser(
                 source_id=sid,
+                raw_id=row[cols["users.id"]],
                 username=username,
                 display_name=str(row[cols["users.display_name"]] or "") if cols["users.display_name"] else "",
                 email=(str(row[cols["users.email"]]) or None)
@@ -404,6 +406,30 @@ def apply_import(
     )
 
 
+def _literal(value: Any) -> str:
+    return str(value) if isinstance(value, int) else "'" + str(value).replace("'", "''") + "'"
+
+
+def scanner_users_sql(report: Report, users: list[SourceUser]) -> str:
+    """SQL для БД «Сканера»: проставить users.platform_sub (контракт v1.1, п. 2.5)."""
+    table = report.columns.get("users.table") or "users"
+    id_col = report.columns.get("users.id") or "id"
+    lines = [
+        "-- Привязка пользователей «Сканера» к пользователям платформы. Выполнить в БД «Сканера»",
+        "-- после миграции, добавившей users.platform_sub, и до включения AUTH_MODE=platform.",
+        "BEGIN;",
+    ]
+    for su in users:
+        sub = report.mapping["users"].get(su.source_id)
+        if sub is None:
+            continue
+        # Имена — из схемы источника, значения экранированы; файл читает и выполняет оператор.
+        stmt = f'UPDATE "{table}" SET platform_sub = \'{sub}\' WHERE "{id_col}" = {_literal(su.raw_id)};'  # noqa: S608
+        lines.append(stmt)
+    lines.append("COMMIT;")
+    return "\n".join(lines) + "\n"
+
+
 def scanner_sql(report: Report, engagements: list[SourceEngagement]) -> str:
     """SQL для БД «Сканера»: проставить engagement.platform_project_id (контракт v1.1, п. 3)."""
     table = report.columns.get("engagements.table") or "engagements"
@@ -417,9 +443,7 @@ def scanner_sql(report: Report, engagements: list[SourceEngagement]) -> str:
         pid = report.mapping["engagements"].get(eng.source_id)
         if pid is None:
             continue
-        ident = (
-            str(eng.raw_id) if isinstance(eng.raw_id, int) else "'" + str(eng.raw_id).replace("'", "''") + "'"
-        )
+        ident = _literal(eng.raw_id)
         # Имена — из схемы источника, значения экранированы; файл читает и выполняет оператор.
         stmt = f'UPDATE "{table}" SET platform_project_id = \'{pid}\' WHERE "{id_col}" = {ident};'  # noqa: S608
         lines.append(stmt)

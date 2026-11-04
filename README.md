@@ -27,7 +27,7 @@ docker compose --profile fakes up --build
 Кабинет: http://127.0.0.1:18090/, вход под `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD`.
 Без `--profile fakes` поднимаются только шлюз, API, оболочка и БД; адреса настоящих продуктов задаются в `.env` (`<ID>_API_UPSTREAM`, `<ID>_WEB_UPSTREAM`).
 
-Установка на сервер, обновление, резервные копии и TLS — [docs/INSTALL.md](docs/INSTALL.md). Ручная проверка этапа 1 — [docs/TESTING.md](docs/TESTING.md).
+Установка на сервер, обновление, резервные копии и TLS — [docs/INSTALL.md](docs/INSTALL.md). Ручная проверка этапа 1 — [docs/TESTING.md](docs/TESTING.md). Переход существующей установки «Сканера» на платформу — [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ## Разработка без Docker
 
