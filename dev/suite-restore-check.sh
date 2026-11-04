@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Проверка шага 3.4: комплект на заглушках → данные → резервная копия → восстановление на чистом стенде.
+# Проверка шагов 3.4 и 5.2: комплект на заглушках → данные → резервная копия → восстановление на чистом стенде;
+# затем защиты restore.sh (подтверждение, испорченный .dump), restore.sh --only и backup.sh --offline.
 #
 #   dev/suite-restore-check.sh            # всё сам: сборка образов, два стенда, проверки, уборка
 #   KEEP=1 dev/suite-restore-check.sh     # оставить восстановленный стенд B запущенным
@@ -194,5 +195,98 @@ for target in vm platform postgres; do
   fi
 done
 ok "пользователь scanner не может подключиться к базам vm, platform, postgres"
+
+# ------------------------------------------------------------------ защиты restore.sh и режимы backup.sh
+# Базы берём из PLATFORM_PRODUCTS стенда, а не из списка продуктов сценария (roadmap §1а).
+IFS=, read -ra STAND_DBS <<<"platform,$(envval PLATFORM_PRODUCTS)"
+ONLY_DB="${STAND_DBS[-1]}" # восстанавливаем одну базу продукта — последнего в списке
+running_services() { stand suite-check-b ps --status running --services | sort; }
+suite_alive() { # комплект работает: те же сервисы запущены, API готов, данные на месте
+  [ "$(running_services)" = "$1" ] || fail "$2: запущены не те сервисы: $(running_services | tr '\n' ' ')"
+  api GET /api/platform/health/ready "" >/dev/null
+  [ "$(code)" = 200 ] || fail "$2: API платформы не готов ($(code))"
+  api GET /api/platform/admin/projects "$ADMIN_TOKEN_B" | jget 'd' | grep -q "$PROJECT_ID" || fail "$2: проекта нет"
+}
+marker() { db_sql suite-check-b "$1" "SELECT count(*) FROM pg_tables WHERE tablename = 'restore_check_marker'"; }
+SERVICES_B="$(running_services)"
+
+step "restore.sh без --yes на базах с данными"
+if COMPOSE_PROJECT_NAME=suite-check-b "$ROOT/deploy/restore.sh" "$BACKUP_DIR" </dev/null >/dev/null 2>"$WORK/err"; then
+  fail "restore.sh без --yes заменил базы с данными"
+fi
+grep -q 'уже содержат данные' "$WORK/err" || fail "restore.sh без --yes: неожиданная ошибка: $(cat "$WORK/err")"
+suite_alive "$SERVICES_B" "после отказа restore.sh"
+ok "без --yes (не в терминале) — отказ «уже содержат данные», комплект продолжает работать"
+# В терминале restore.sh спрашивает подтверждение; ответ «n» — тот же отказ. script(1) даёт ему терминал.
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
+  : >"$WORK/tty"
+  { # ответ — только после вопроса: docker compose exec до вопроса читает stdin и съел бы его
+    for _ in $(seq 1 60); do grep -q 'Продолжить?' "$WORK/tty" && break; sleep 1; done
+    printf 'n\n'
+    sleep 5
+  } | COMPOSE_PROJECT_NAME=suite-check-b timeout 120 script -qefc "'$ROOT/deploy/restore.sh' '$BACKUP_DIR'" /dev/null >"$WORK/tty" 2>&1 || true
+  grep -q 'Продолжить? \[y/N\]' "$WORK/tty" || fail "restore.sh в терминале не спросил подтверждение: $(tail -n 3 "$WORK/tty")"
+  grep -q 'отменено' "$WORK/tty" || fail "restore.sh в терминале: ответ «n» не отменил восстановление"
+  suite_alive "$SERVICES_B" "после ответа «n»"
+  ok "в терминале спрашивает «Продолжить? [y/N]», ответ «n» — отмена, комплект продолжает работать"
+fi
+
+step "restore.sh с испорченным .dump"
+BROKEN="$WORK/backup-broken"
+cp -a "$BACKUP_DIR" "$BROKEN"
+printf 'X' | dd of="$BROKEN/$ONLY_DB.dump" bs=1 seek=100 conv=notrunc status=none
+db_sql suite-check-b "$ONLY_DB" 'CREATE TABLE restore_check_marker ()' >/dev/null
+if COMPOSE_PROJECT_NAME=suite-check-b "$ROOT/deploy/restore.sh" "$BROKEN" --yes >/dev/null 2>"$WORK/err"; then
+  fail "restore.sh принял испорченный $ONLY_DB.dump"
+fi
+grep -q 'контрольные суммы не сходятся' "$WORK/err" || fail "испорченный .dump: неожиданная ошибка: $(cat "$WORK/err")"
+[ "$(marker "$ONLY_DB")" = 1 ] || fail "испорченный .dump: база $ONLY_DB затронута до проверки сумм"
+suite_alive "$SERVICES_B" "после испорченного .dump"
+ok "испорченный $ONLY_DB.dump — «контрольные суммы не сходятся», ни одна база не тронута, комплект работает"
+rm -rf "$BROKEN"
+db_sql suite-check-b "$ONLY_DB" 'DROP TABLE restore_check_marker' >/dev/null
+
+step "backup.sh --offline"
+BACKUP_OFF="$WORK/backup-offline"
+declare -A BOOTS_OFF
+for id in "${PRODUCTS[@]}"; do BOOTS_OFF[$id]="$(db_sql suite-check-b "$id" 'SELECT count(*) FROM fake_boot')"; done
+COMPOSE_PROJECT_NAME=suite-check-b "$ROOT/deploy/backup.sh" --offline "$BACKUP_OFF" >/dev/null 2>"$WORK/err" \
+  || fail "backup.sh --offline: $(cat "$WORK/err")"
+stopped_list="$(sed -n 's/^backup.sh: останавливаю на время копии: //p' "$WORK/err" | tr ' ' '\n' | sort)"
+[ "$stopped_list" = "$(grep -vx db <<<"$SERVICES_B")" ] \
+  || fail "backup.sh --offline остановил не все приложения: $(tr '\n' ' ' <<<"$stopped_list")"
+grep -q 'запускаю приложения обратно' "$WORK/err" || fail "backup.sh --offline не запустил приложения обратно"
+grep -qx 'offline=1' "$BACKUP_OFF/MANIFEST" || fail "в MANIFEST нет offline=1"
+for db in "${STAND_DBS[@]}"; do [ -s "$BACKUP_OFF/$db.dump" ] || fail "в копии --offline нет $db.dump"; done
+for _ in $(seq 1 60); do # start без --wait: ждём, пока приложения поднимутся
+  [ "$(running_services)" = "$SERVICES_B" ] && api GET /api/platform/health/ready "" >/dev/null && [ "$(code)" = 200 ] && break
+  sleep 2
+done
+suite_alive "$SERVICES_B" "после backup.sh --offline"
+for id in "${PRODUCTS[@]}"; do # заглушка пишет запись при каждом старте: значит, её останавливали и запустили
+  for _ in $(seq 1 30); do
+    n="$(db_sql suite-check-b "$id" 'SELECT count(*) FROM fake_boot')"
+    [ "$n" -gt "${BOOTS_OFF[$id]}" ] && break
+    sleep 2
+  done
+  [ "$n" -gt "${BOOTS_OFF[$id]}" ] || fail "$id не перезапускался во время backup.sh --offline"
+done
+ok "приложения остановлены на время копии ($(tr '\n' ' ' <<<"$stopped_list")) и запущены обратно, offline=1 в MANIFEST"
+
+step "restore.sh --only $ONLY_DB"
+for db in "${STAND_DBS[@]}"; do db_sql suite-check-b "$db" 'CREATE TABLE restore_check_marker ()' >/dev/null; done
+COMPOSE_PROJECT_NAME=suite-check-b "$ROOT/deploy/restore.sh" "$BACKUP_OFF" --only "$ONLY_DB" --yes >/dev/null 2>"$WORK/err" \
+  || fail "restore.sh --only $ONLY_DB: $(cat "$WORK/err")"
+grep -q "базы: $ONLY_DB\$" "$WORK/err" || fail "restore.sh --only восстанавливал не одну базу: $(grep 'базы:' "$WORK/err")"
+[ "$(marker "$ONLY_DB")" = 0 ] || fail "база $ONLY_DB не заменена копией"
+for db in "${STAND_DBS[@]}"; do
+  [ "$db" = "$ONLY_DB" ] && continue
+  [ "$(marker "$db")" = 1 ] || fail "restore.sh --only $ONLY_DB затронул базу $db"
+  db_sql suite-check-b "$db" 'DROP TABLE restore_check_marker' >/dev/null
+done
+suite_alive "$SERVICES_B" "после restore.sh --only"
+api GET "/api/$ONLY_DB/summary?project=$PROJECT_ID" "$USER_TOKEN_B" >/dev/null
+[ "$(code)" = 200 ] || fail "$ONLY_DB после восстановления одной базы: /summary → $(code)"
+ok "восстановлена только $ONLY_DB, остальные базы не тронуты, $ONLY_DB снова отвечает"
 
 printf '\nВосстановление на чистом стенде: ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ\n' >&2

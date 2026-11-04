@@ -58,7 +58,9 @@ class JwksCache:
             for r in revoked:
                 self._keys.pop(r, None)
             if revoked or kid not in self._keys:
-                self._fetched_at = 0.0
+                # Не 0.0: time.monotonic() отсчитывается от загрузки машины, и на свежей машине (раннер CI)
+                # возраст «с нуля» меньше 30 с — перечитывания бы не было.
+                self._fetched_at = float("-inf")
 
 
 @dataclass
