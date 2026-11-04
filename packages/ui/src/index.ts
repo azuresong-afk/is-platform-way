@@ -28,6 +28,15 @@ export { Empty, type EmptyProps, ErrorAlert, type ErrorAlertProps, Loading } fro
 export { Kpi, type KpiProps } from "./components/Kpi";
 export { Layout, type LayoutProps, type LayoutUser, type NavItem, PageHead, type PageHeadProps } from "./components/Layout";
 export { ConfirmDanger, type ConfirmProps, Drawer, type DrawerProps, Modal, type ModalProps } from "./components/Overlay";
+export {
+  NotificationBell,
+  type NotificationBellProps,
+  type NotificationItem,
+  NotificationRow,
+  notificationsChanged,
+  NOTIFICATIONS_EVENT,
+  safeLink,
+} from "./components/NotificationBell";
 export { Pager, type PagerProps } from "./components/Pager";
 export { PlatformTabs, type PlatformTabsProps } from "./components/PlatformTabs";
 export { ProductTabs, type ProductTabsProps, type TabProduct } from "./components/ProductTabs";

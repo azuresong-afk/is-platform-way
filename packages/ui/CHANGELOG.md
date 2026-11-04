@@ -2,6 +2,14 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [Не выпущено]
+
+### Добавлено
+- `NotificationBell`: колокольчик с числом непрочитанных и выпадающей панелью последних уведомлений (API платформы, опрос раз в минуту); `NotificationRow`, `safeLink`, `notificationsChanged`, `NOTIFICATIONS_EVENT`, тип `NotificationItem`.
+
+### Изменено
+- `PlatformTabs` рисует `NotificationBell`; проп `unread` больше не нужен и игнорируется (оставлен для совместимости).
+
 ## [1.0.0] — 2026-11-04
 
 ### Изменено
