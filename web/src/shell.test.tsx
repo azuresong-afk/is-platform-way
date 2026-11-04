@@ -88,6 +88,36 @@ describe("Главная", () => {
     await waitFor(() => expect(within(grc()).getByText("50 %")).toBeInTheDocument());
   });
 
+  it("новый продукт без доработки оболочки: карточка по общему формату kpis", async () => {
+    const demo = { id: "demo", title: "Демо", icon: "box", base_path: "/demo/", summary_url: "/api/demo/summary", health: "ok", my_roles: ["viewer"] };
+    const json = (body: unknown) => () => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } }));
+    mockApi({
+      "/api/platform/products": json([...PRODUCTS, demo]),
+      "/api/demo/summary": json({
+        product: "demo",
+        data: {
+          kpis: [
+            { label: "Записи", value: 1234, link: `/demo/items?project=${P1}` },
+            { label: "Критичные", value: 2, severity: "critical" },
+            { label: "Внешняя", value: 1, link: "https://evil.example/" },
+            { label: "Сломанный" },
+          ],
+          note: "Ближайшее окно — 06.11",
+        },
+      }),
+    });
+    renderHome();
+    const card = () => screen.getByRole("region", { name: "Демо" });
+    await waitFor(() => expect(within(card()).getByText("Записи")).toBeInTheDocument());
+    expect(within(card()).getByText("Ближайшее окно — 06.11")).toBeInTheDocument();
+    expect(within(card()).getByRole("link", { name: /1\s?234/ })).toHaveAttribute("href", `/demo/items?project=${P1}`);
+    expect(within(card()).getByText("2")).toHaveClass("sev-critical");
+    // Ссылка на чужой origin не становится ссылкой; элемент без value пропускается.
+    expect(within(card()).getByText("Внешняя")).toBeInTheDocument();
+    expect(within(card()).queryByRole("link", { name: "1" })).toBeNull();
+    expect(within(card()).queryByText("Сломанный")).toBeNull();
+  });
+
   it("нет ролей в продуктах — пустое состояние, а не ошибка", async () => {
     mockApi({ "/api/platform/products": () => Promise.resolve(new Response("[]", { status: 200, headers: { "content-type": "application/json" } })) });
     renderHome();

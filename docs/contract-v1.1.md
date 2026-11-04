@@ -11,13 +11,14 @@
 | 2.1 | `aud` в токене пользователя — **все продукты установки**; отсутствие своих ролей — **403**, а не 401 | иначе фронтенд уходит в цикл refresh → вход вместо понятного «нет доступа» |
 | 2.2 | Сервисные токены (client credentials) и их утверждения | межпродуктовые вызовы без учётки человека |
 | 2.3 | Поле `typ` и `auth_source` в токене; `kid` в заголовке обязателен | различать людей и сервисы, ротация ключей |
-| 2.4 | Правила обработки 401/403 во фронтенде и одна общая попытка refresh | несколько SPA на одном origin |
+| 2.4 | Правила обработки 401/403 во фронтенде и одна общая попытка refresh; выход сигналит другим вкладкам (`platform.logout`) | несколько SPA на одном origin; «выход отовсюду» — найдено e2e (шаг 3.6) |
 | 2.5 | Привязка существующих локальных пользователей продукта к `sub` платформы по имени входа | при переходе на платформу не теряется авторство прогонов, находок и записей аудита |
 | 3.1 | Проверка проекта: `projects` в токене — источник истины о доступе к проекту | одинаковое поведение во всех продуктах |
+| 4.1 | Сводный реестр активов: API чтения, правило слияния, `sources[]`, события `<id>.asset.*` от любого продукта | шаг 2.4; новый продукт может пополнять реестр без доработки платформы |
 | 5.1 | В манифесте новые поля: `summary_url`, `events`, `roles` включает надбавки | Главная, подписки |
 | 5.2 | Внутренний адрес манифеста для платформы | опрос без шлюза |
 | 6.1 | Подпись событий: секрет на продукт, заголовки `X-Platform-Product`, `X-Event-Id` | проверка источника |
-| 6.2 | Схемы `data` для минимального набора событий | сводный реестр и журнал |
+| 6.2 | Схемы `data` для минимального набора событий; тип `grc.document.approval_requested` | сводный реестр и журнал; уведомление утверждающих |
 | 6.3 | Необязательное поле `notify` в конверте | центр уведомлений |
 | 6.4 | Доставка событий подписчикам: подпись, ответы, повторы | |
 | 7.1 | Формат ответа `search_url` | Ctrl+K |
@@ -69,7 +70,8 @@
 - Если refresh вернул 401 — очистить `platform.token` и перейти на `/login?next=<путь с query>`. Страница входа — у оболочки, у продукта в режиме `platform` своей нет.
 - При 403 `no_product_roles` — не делать refresh.
 - Ответ `POST /auth/refresh` и `/auth/login`: `{access_token, token_type, expires_in, user:{id, username, name}}`.
-- Выход из любого продукта — `POST /api/platform/auth/logout`, очистка `platform.token`, переход на `/login`.
+- Выход из любого продукта — `POST /api/platform/auth/logout`, очистка `platform.token`, запись `localStorage['platform.logout'] = <время в мс>`, переход на `/login`.
+- Каждая вкладка слушает событие `storage` по ключу `platform.logout`: очистить свой `platform.token` и перейти на `/login?next=<путь с query>`. Без этого открытые вкладки других продуктов работают до истечения access-токена (15 мин), хотя refresh-cookie уже отозвана. В `@platform/ui` это делают `logout()` и `AuthProvider` (`onLogoutElsewhere`).
 
 ### 2.5. Привязка существующих пользователей при переходе на платформу
 
@@ -88,6 +90,28 @@
 - Продукт пускает пользователя в проект, если `projects` содержит `"*"` или uuid проекта. Иначе — `403 {"detail":"no_project_access"}`.
 - Архивный проект доступен только на чтение; изменяющие запросы — `409 {"detail":"project_archived"}`. Статус проекта продукт берёт из `GET /api/platform/projects/{id}` (кэш до 5 мин) или из события `platform.project.updated`.
 - Продукт **не создаёт** проекты в режиме `platform`; если пришёл неизвестный ему `project` — создаёт у себя «тень» с `platform_project_id` и полями из `GET /api/platform/projects/{id}`.
+
+## 4. Активы — уточнения
+
+### 4.1. Сводный реестр
+
+**Чтение (для продуктов и оболочки).** С токеном пользователя (`aud` содержит `platform`), доступ — как к проекту (п. 3.1):
+
+- `GET /api/platform/projects/{id}/assets?q=&criticality=&os_family=&owner=&tag=&group=&source=&manual=&updated_since=&sort=&limit=&offset=` — список, всего — `X-Total-Count`. `criticality` можно повторять, `none` — не задана; `source` — id продукта, который знает об активе; `sort` — `address|hostname|owner|criticality|updated_at`, `-` в начале — по убыванию; `limit` до 500.
+- `GET /api/platform/projects/{id}/assets/facets` — значения для фильтров (теги, группы, источники, семейства ОС).
+- `GET /api/platform/assets/{id}`.
+
+Актив: `{id, project_id, address, hostname, os_family, os, owner, criticality: low|medium|high|critical|null, tags[], groups[], sources: [{product, external_id, seen_at}], manual_fields[], created_at, updated_at}`. Ключ — `(project_id, address)`; адрес нормализуется (IP — канонический вид, имя — нижний регистр).
+
+**Пополнение.**
+
+- События `<id>.asset.upserted` / `<id>.asset.deleted` от **любого** подключённого продукта (схема `data` — как у `scanner.asset.*`, п. 6.2). `project_id` в конверте обязателен. Событие с неизвестным проектом или неверным адресом принимается (202), но реестр не меняет. Событие старше уже применённого от того же продукта игнорируется.
+- `deleted` убирает только запись этого продукта из `sources[]`; актив удаляется, когда источников не осталось и ручных полей нет.
+- Ручная правка и импорт CSV — администратор платформы: `POST /projects/{id}/assets`, `PATCH /assets/{id}` (поля + `reset: [поле]` — вернуть значение из продуктов), `DELETE /assets/{id}`, `POST /projects/{id}/assets/import` (multipart `file`, `?dry_run=true` — только проверка). Источник таких изменений — `platform`.
+
+**Правило слияния.** Поле, заданное вручную или из CSV, попадает в `manual_fields` и событиями **не перетирается**. Остальные поля берутся из самого свежего события. Пустая ячейка CSV поле не меняет.
+
+**События платформы.** `platform.asset.upserted` (data — актив целиком), `platform.asset.deleted {asset_id, address}`, `platform.asset.imported {project_id, created, updated, unchanged}` — продукт может подписаться через `events.subscribe`.
 
 ## 5. Манифест — уточнения
 
@@ -110,10 +134,13 @@
 - `summary_url` — см. п. 10. Если поля нет, Главная показывает карточку «нет сводки».
 - `events.webhook` — путь **внутри API продукта** (без `/api/<id>`), куда платформа доставляет события; `events.subscribe` — типы событий (допускается суффикс `.*`, например `scanner.*`).
 - `nav[].perm` — информационно; видимость пунктов меню продукт решает сам.
+- `order` (необязательно, число) — место вкладки в оболочке: меньше — левее. Без поля вкладка стоит на месте id продукта в `PLATFORM_PRODUCTS`.
 
 ### 5.2. Откуда платформа берёт манифест
 
-Платформа читает манифест по **внутреннему** адресу API продукта (`SCANNER_API_UPSTREAM` + `/manifest`) раз в минуту и при старте; там же — `health_url` без префикса `/api/<id>` (то есть `/health/ready`).
+Продукты установки перечислены в `PLATFORM_PRODUCTS` платформы; id — `^[a-z][a-z0-9]{1,19}$`, кроме `platform`, `api`, `admin`, `login`, `assets`, `fonts`. Пока продукт не ответил, платформа показывает встроенный манифест известного продукта или минимальный (название = id, ролей нет).
+
+Платформа читает манифест по **внутреннему** адресу API продукта (`<ID>_API_UPSTREAM` + `/manifest`, например `SCANNER_API_UPSTREAM`) раз в минуту и при старте; там же — `health_url` без префикса `/api/<id>` (то есть `/health/ready`).
 
 ## 6. События — уточнения
 
@@ -143,6 +170,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 | `vm.ticket.status_changed` | `{ticket_id, from, to, assignee_sub}` |
 | `vm.remediation.verified` | `{ticket_id, run_id, result: fixed|not_fixed|not_verified}` |
 | `grc.assessment.updated` | `{system_id, title, percent, status}` |
+| `grc.document.approval_requested` | `{document_id, title, system_id, author_sub}`; `notify` — пользователям с ролью `approve` в проекте, кроме автора |
 | `audit.recorded` | `{time, actor:{sub,name}, action, object, result: success|failure|denied, ip, details}` (`project_id` — в конверте) |
 
 Дополнительные поля в `data` допустимы и сохраняются.
@@ -218,6 +246,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 | `platform.token` | `sessionStorage` | access-токен |
 | `platform.project` | `localStorage` | uuid текущего проекта |
 | `platform.theme` | `localStorage` | `dark` \| `light`; при чтении учитывать старый `scanner.theme` |
+| `platform.logout` | `localStorage` | время последнего выхода (мс); только как сигнал другим вкладкам, п. 2.4 |
 
 Смена темы или проекта в одной вкладке приходит в другие через событие `storage`; продукты должны его слушать (это делают хуки `useTheme`/`useProject` из `@platform/ui`).
 
@@ -259,6 +288,8 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 
 ## Что сделать каждому продукту
 
+Подробно, с примерами запросов и тестовыми векторами, — [`docs/integration/`](integration/README.md).
+
 ### «Сканер» (`scanner`)
 
 1. Режим `AUTH_MODE=platform`: проверка JWT по JWKS (п. 2.1–2.3), привязка существующих пользователей и теневые пользователи по `sub` (п. 2.5), 403 `no_product_roles`/`no_project_access`.
@@ -284,5 +315,5 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 1–2. Как у «Сканера».
 3. Манифест с ролями `admin, methodologist, assessor, approve, viewer`.
 4. `GET /summary` (п. 10), `GET /search`.
-5. События `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — с `notify` пользователям с ролью `approve`.
+5. События `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — событие `grc.document.approval_requested` с `notify` пользователям с ролью `approve`.
 6. Фронтенд — как у «Сканера», `VITE_BASE=/grc/`, угловатые токены по п. 9.1.

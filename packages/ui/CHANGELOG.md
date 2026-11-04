@@ -2,6 +2,11 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [Не выпущено]
+
+### Добавлено
+- Выход отовсюду (контракт v1.1, п. 2.4, 11): `logout()` пишет сигнал `localStorage['platform.logout']`, `AuthProvider` слушает его и уводит остальные вкладки на вход. Для своих фронтендов — `onLogoutElsewhere()` и ключ `LOGOUT_KEY`.
+
 ## [1.0.0] — 2026-11-04
 
 ### Изменено

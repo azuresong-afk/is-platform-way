@@ -10,10 +10,12 @@ python - <<'PY' || fail "PLATFORM_SECRET_KEY должен быть 32 байта
 import base64, os, sys
 sys.exit(0 if len(base64.b64decode(os.environ["PLATFORM_SECRET_KEY"])) == 32 else 1)
 PY
-for p in SCANNER VM GRC; do
+# Продукты — из PLATFORM_PRODUCTS (roadmap §1а); id проверяет сам API при старте.
+for id in $(printf '%s' "${PLATFORM_PRODUCTS:-scanner,vm,grc}" | tr ',' ' '); do
+  p=$(echo "$id" | tr a-z A-Z | tr -c 'A-Z0-9\n' '_')
   eval "up=\${${p}_API_UPSTREAM:-}; sec=\${${p}_EVENTS_SECRET:-}"
   if [ -n "$up" ] && [ ${#sec} -lt 16 ]; then
-    fail "${p}_EVENTS_SECRET короче 16 символов, а продукт подключён"
+    fail "${p}_EVENTS_SECRET короче 16 символов, а продукт ${id} подключён"
   fi
 done
 

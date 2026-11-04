@@ -16,18 +16,14 @@ services:
         condition: service_healthy
       platform-web:
         condition: service_healthy
+    # Продукты (PLATFORM_PRODUCTS и <ID>_*) шлюз читает из .env целиком: новый продукт
+    # подключается без правки этого файла (roadmap §1а).
+    env_file: .env
     environment:
       PLATFORM_API_UPSTREAM: http://platform-api:8000
       PLATFORM_WEB_UPSTREAM: http://platform-web:8080
-      SCANNER_API_UPSTREAM: ${SCANNER_API_UPSTREAM:-}
-      SCANNER_WEB_UPSTREAM: ${SCANNER_WEB_UPSTREAM:-}
-      VM_API_UPSTREAM: ${VM_API_UPSTREAM:-}
-      VM_WEB_UPSTREAM: ${VM_WEB_UPSTREAM:-}
-      GRC_API_UPSTREAM: ${GRC_API_UPSTREAM:-}
-      GRC_WEB_UPSTREAM: ${GRC_WEB_UPSTREAM:-}
       SERVER_NAME: ${SERVER_NAME:-_}
       CLIENT_MAX_BODY: ${CLIENT_MAX_BODY:-20m}
-      BDU_UPLOAD_MAX_BODY: ${BDU_UPLOAD_MAX_BODY:-512m}
       TLS_CERT: ${TLS_CERT:-}
       TLS_KEY: ${TLS_KEY:-}
     volumes:
@@ -43,6 +39,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Продукты (PLATFORM_PRODUCTS и <ID>_*) — из .env целиком, как у шлюза.
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://${PLATFORM_DB_USER:-platform}:${PLATFORM_DB_PASSWORD:?задайте PLATFORM_DB_PASSWORD}@db:5432/${PLATFORM_DB_NAME:-platform}
       PLATFORM_SECRET_KEY: ${PLATFORM_SECRET_KEY:?задайте PLATFORM_SECRET_KEY}
@@ -52,12 +50,6 @@ services:
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Администратор платформы}
       LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-5}
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
-      SCANNER_API_UPSTREAM: ${SCANNER_API_UPSTREAM:-}
-      VM_API_UPSTREAM: ${VM_API_UPSTREAM:-}
-      GRC_API_UPSTREAM: ${GRC_API_UPSTREAM:-}
-      SCANNER_EVENTS_SECRET: ${SCANNER_EVENTS_SECRET:-}
-      VM_EVENTS_SECRET: ${VM_EVENTS_SECRET:-}
-      GRC_EVENTS_SECRET: ${GRC_EVENTS_SECRET:-}
     ports:
       - "127.0.0.1:${PLATFORM_API_PORT:-18010}:8000"
     logging: *logging
@@ -111,6 +103,15 @@ services:
       PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
       PLATFORM_EVENTS_SECRET: ${GRC_EVENTS_SECRET:-}
       FAKE_DELAY_SECONDS: ${FAKE_GRC_DELAY_SECONDS:-0}
+    logging: *logging
+
+  # Четвёртый продукт: проверка подключения нового продукта только через .env (INSTALL.md).
+  fake-demo:
+    profiles: [fakes]
+    build: { context: ./dev, args: { PRODUCT: fake-demo } }
+    environment:
+      PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
+      PLATFORM_EVENTS_SECRET: ${DEMO_EVENTS_SECRET:-}
     logging: *logging
 
   # --- учебная БД «Сканера» до перехода (профиль migration, docs/MIGRATION.md) ---

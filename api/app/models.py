@@ -272,3 +272,30 @@ class Delivery(Base):
     last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Asset(Base):
+    """Сводный реестр активов (контракт v1.1, п. 4). Ключ сопоставления — (project_id, address).
+
+    sources — кто что знает об активе: [{product, external_id, seen_at, event_time}];
+    manual_fields — поля, заданные вручную (правка или CSV): события их не перетирают.
+    """
+
+    __tablename__ = "assets"
+    __table_args__ = (UniqueConstraint("project_id", "address"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    address: Mapped[str] = mapped_column(String(255))
+    hostname: Mapped[str] = mapped_column(String(255), default="")
+    os_family: Mapped[str] = mapped_column(String(50), default="")
+    os: Mapped[str] = mapped_column(String(200), default="")
+    owner: Mapped[str] = mapped_column(String(200), default="")
+    # low | medium | high | critical | "" (не задана)
+    criticality: Mapped[str] = mapped_column(String(20), default="", index=True)
+    tags: Mapped[list] = mapped_column(JsonType, default=list)
+    groups: Mapped[list] = mapped_column(JsonType, default=list)
+    sources: Mapped[list] = mapped_column(JsonType, default=list)
+    manual_fields: Mapped[list] = mapped_column(JsonType, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
