@@ -28,17 +28,21 @@ def create_app() -> FastAPI:
             products.sync_from_settings(db)
             keys.ensure_active_key(db)
             users.ensure_bootstrap_admin(db)
-        poller = dispatcher = None
+        poller = dispatcher = scheduler = None
         if settings.background_tasks:
             poller = products.ManifestPoller(settings.manifest_poll_seconds)
             poller.start()
             dispatcher = events.Dispatcher()
             dispatcher.start()
+            scheduler = keys.RotationScheduler(settings.key_rotation_check_seconds)
+            scheduler.start()
         yield
         if poller:
             poller.stop_event.set()
         if dispatcher:
             dispatcher.stop()
+        if scheduler:
+            scheduler.stop_event.set()
 
     # API работает за шлюзом с отрезанием префикса /api/platform (контракт v1, п. 1);
     # префикс для документации задаётся при запуске: uvicorn --root-path /api/platform.

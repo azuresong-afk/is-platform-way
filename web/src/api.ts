@@ -144,6 +144,31 @@ export interface Subscription {
   dead: number;
 }
 
+export interface SigningKey {
+  kid: string;
+  status: "next" | "active" | "retired" | "revoked";
+  alg: string;
+  crv: string;
+  created_at: string;
+  activated_at: string | null;
+  retired_at: string | null;
+  in_jwks: boolean;
+  until: string | null;
+}
+
+export interface SigningKeys {
+  keys: SigningKey[];
+  schedule: {
+    rotation_days: number;
+    next_lead_seconds: number;
+    jwks_retain_seconds: number;
+    access_ttl_seconds: number;
+    next_rotation_at: string | null;
+    scheduler_enabled: boolean;
+  };
+  warnings: string[];
+}
+
 export interface Member {
   user_id: string;
   username: string;

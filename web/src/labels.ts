@@ -32,6 +32,13 @@ export const DELIVERY_STATUS: Record<string, { label: string; pill: string }> = 
   failed: { label: "Повтор", pill: "pill-warn" },
   dead: { label: "Не доставлено", pill: "pill-danger" },
   none: { label: "Нет подписчиков", pill: "pill-muted" },
+}
+
+export const KEY_STATUS: Record<string, { label: string; pill: string }> = {
+  next: { label: "Опубликован заранее", pill: "pill-info" },
+  active: { label: "Подписывает", pill: "pill-ok" },
+  retired: { label: "Выведен", pill: "pill-muted" },
+  revoked: { label: "Отозван", pill: "pill-danger" },
 };
 
 /** Критичность актива (женский род: «критичность»). */
