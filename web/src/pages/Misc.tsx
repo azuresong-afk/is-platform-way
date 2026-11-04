@@ -1,17 +1,6 @@
-import { Empty, PageHead, useAuth } from "@platform/ui";
-import { BellOff, Compass, ShieldOff } from "lucide-react";
+import { Empty, useAuth } from "@platform/ui";
+import { Compass, ShieldOff } from "lucide-react";
 import type { ReactNode } from "react";
-
-export function NotificationsPage() {
-  return (
-    <>
-      <PageHead breadcrumbs="Платформа" title="Уведомления" />
-      <section className="card">
-        <Empty icon={BellOff} title="Новых уведомлений нет" text="Здесь появятся назначенные заявки, завершённые прогоны и документы на утверждение." />
-      </section>
-    </>
-  );
-}
 
 export function NotFoundPage() {
   return (

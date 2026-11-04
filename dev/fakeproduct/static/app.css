@@ -1,0 +1,9 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: #0f1115; color: #e6e8ee; }
+.tabs { display: flex; gap: 4px; padding: 8px 16px; background: #161a22; }
+.tabs a { color: #aab1c0; text-decoration: none; padding: 6px 10px; border-radius: 3px; }
+.tabs a[aria-current="page"] { background: #2a3140; color: #fff; }
+main { padding: 16px; }
+.note { color: #8a93a6; }
+dt { color: #8a93a6; margin-top: 8px; }
+dd { margin: 0; font-family: ui-monospace, monospace; }
+button { margin-top: 16px; padding: 6px 12px; border-radius: 3px; }

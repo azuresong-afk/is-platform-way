@@ -1,9 +1,9 @@
-import { Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../hooks/useAuth";
 import { useProject } from "../hooks/useProject";
 import { PLATFORM_API } from "../lib/api";
+import { NotificationBell } from "./NotificationBell";
 import { ProductTabs, type TabProduct } from "./ProductTabs";
 import { UserMenu } from "./UserMenu";
 
@@ -11,13 +11,14 @@ export interface PlatformTabsProps {
   /** "home" в оболочке, иначе id продукта. */
   active: string;
   apiBase?: string;
+  /** Страница всех уведомлений (в оболочке платформы). */
   notificationsHref?: string;
-  /** Есть непрочитанные уведомления (рисует точку на колокольчике). */
+  /** @deprecated Счётчик колокольчик берёт сам из API платформы; значение игнорируется. */
   unread?: number;
 }
 
 /** Строка вкладок с данными платформы: GET /api/platform/products (только продукты с ролями). */
-export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref = "/notifications", unread = 0 }: PlatformTabsProps) {
+export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref = "/notifications" }: PlatformTabsProps) {
   const auth = useAuth();
   const { projectId } = useProject();
   const [products, setProducts] = useState<TabProduct[]>([]);
@@ -43,10 +44,7 @@ export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref
       projectId={projectId}
       right={
         <>
-          <a className="icon-btn" href={notificationsHref} aria-label={unread ? `Уведомления: ${unread}` : "Уведомления"}>
-            <Bell size={18} aria-hidden="true" />
-            {unread > 0 && <span className="dot" aria-hidden="true" />}
-          </a>
+          <NotificationBell apiBase={apiBase} href={notificationsHref} />
           {auth.user && <UserMenu name={auth.user.name} subtitle={auth.user.username} onLogout={auth.logout} />}
         </>
       }

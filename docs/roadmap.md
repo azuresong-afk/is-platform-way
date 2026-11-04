@@ -79,7 +79,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 - Карточка Главной рисуется по общему формату сводки (контракт v1.1, п. 10.1); особое оформление для известного продукта — необязательное улучшение, без него карточка всё равно работает.
 - Перенос данных из конкретного продукта (импорт «Сканера») — отдельная утилита, а не часть ядра.
 
-Что сейчас нарушает правило и исправляется отдельным шагом **М.1**: фиксированный список `scanner/vm/grc` в `config.py`, `products.py` (встроенные манифесты, порядок), `gateway/render.sh` (цикл и ветка БДУ), `docker-entrypoint.sh`, `docker-compose.yml` (переменные по продуктам), ветвления по id в карточках Главной и текст экрана «Продукты».
+Что нарушало правило и исправлено шагом **М.1** (сделан): фиксированный список `scanner/vm/grc` в `config.py`, `products.py` (встроенные манифесты, порядок), `gateway/render.sh` (цикл и ветка БДУ), `docker-entrypoint.sh`, `docker-compose.yml` (переменные по продуктам), ветвления по id в карточках Главной и текст экрана «Продукты».
 
 ## 2. Модель данных (platform-api)
 
@@ -105,7 +105,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 | `deliveries` | id, event_id, subscription_id, status (`pending/ok/failed/dead`), attempts, next_attempt_at, last_error, last_status_code, delivered_at | повторы 1/5/15/60 мин, затем `dead` |
 | `assets` | id, project_id, address, hostname, os_family, os, owner, criticality, tags[], groups[], sources (jsonb: `[{product, external_id, seen_at}]`), manual_fields[], updated_at | уникальность `(project_id, address)`; ручные правки не перетираются событиями |
 | `audit_log` | id (bigserial), time, product, actor_sub, actor_name, action, object, project_id, result, ip, details (jsonb), event_id | append-only, триггер запрещает UPDATE/DELETE |
-| `notifications` | id, user_id, event_id, title, link, product, created_at, read_at | из поля `notify` событий |
+| `notifications` | id, user_id, event_id, product, event_type, project_id, title, link, created_at, read_at | из поля `notify` событий; уникальность `(user_id, event_id)` |
 
 ## 3. API платформы (через шлюз — `/api/platform/…`)
 
@@ -131,7 +131,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 | `POST /events` | приём событий от продуктов (HMAC) |
 | `GET /admin/events`, `POST /admin/events/{id}/redeliver`, `GET /admin/subscriptions` | события и доставка |
 | `GET /audit?product=&actor=&project=&action=&from=&to=&limit=&offset=`, `GET /audit/export?format=csv|json` | сводный журнал |
-| `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | центр уведомлений |
+| `GET /notifications` (`unread`, `product`, `project`, пагинация; `X-Unread-Count`), `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/{id}/unread`, `POST /notifications/read-all` | центр уведомлений, только свои |
 | `GET /summary?project=` | сводка по продуктам для Главной (агрегатор с таймаутом) |
 | `GET /search?q=&project=` | — **[выбор]** не делаем: Ctrl+K опрашивает `search_url` продуктов прямо из браузера параллельно, как в контракте |
 | `GET /health/live`, `GET /health/ready` | проверки |
@@ -174,7 +174,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 
 | # | Задача | Критерий |
 |---|---|---|
-| М.1 | Список продуктов из `PLATFORM_PRODUCTS`, общий формат сводки, переменные продукта для шлюза, `env_file` в compose | тест: четвёртый продукт-заглушка подключается только правкой `.env`, без изменений кода платформы |
+| М.1 ✓ | Список продуктов из `PLATFORM_PRODUCTS`, общий формат сводки, переменные продукта для шлюза, `env_file` в compose | тест: четвёртый продукт-заглушка подключается только правкой `.env`, без изменений кода платформы |
 
 ### Этап 2 — данные
 

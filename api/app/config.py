@@ -3,14 +3,39 @@
 from __future__ import annotations
 
 import base64
+import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
+from dotenv import dotenv_values
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Идентификаторы продуктов по контракту v1, п. 1.
-PRODUCT_IDS = ("scanner", "vm", "grc")
+# Продукты установки задаются только окружением (roadmap §1а): PLATFORM_PRODUCTS — список id,
+# для каждого id — переменные <ID>_API_UPSTREAM, <ID>_WEB_UPSTREAM, <ID>_EVENTS_SECRET.
+DEFAULT_PLATFORM_PRODUCTS = "scanner,vm,grc"
+# id продукта — сегмент пути (/api/<id>/, /<id>/), значение aud в JWT и префикс переменных.
+PRODUCT_ID_RE = re.compile(r"^[a-z][a-z0-9]{1,19}$")
+# Пути, которые занимает сама платформа.
+RESERVED_PRODUCT_IDS = frozenset({"platform", "api", "admin", "login", "assets", "fonts"})
+
+
+def parse_product_ids(raw: str) -> list[str]:
+    """Разбирает PLATFORM_PRODUCTS: id через запятую и/или пробел; порядок сохраняется."""
+    out: list[str] = []
+    for pid in re.split(r"[\s,]+", raw.strip()):
+        if not pid or pid in out:
+            continue
+        if not PRODUCT_ID_RE.match(pid):
+            raise RuntimeError(
+                f"PLATFORM_PRODUCTS: недопустимый id «{pid}» — нужны строчные латинские буквы и цифры, "
+                "2–20 символов, первая — буква"
+            )
+        if pid in RESERVED_PRODUCT_IDS:
+            raise RuntimeError(f"PLATFORM_PRODUCTS: id «{pid}» зарезервирован платформой")
+        out.append(pid)
+    return out
 
 
 @dataclass(frozen=True)
@@ -19,6 +44,9 @@ class ProductConfig:
     # Внутренний адрес API продукта (без /api/<id>), например http://scanner-app:8000
     api_upstream: str
     events_secret: str
+    web_upstream: str = ""
+    # Место в PLATFORM_PRODUCTS: порядок вкладок, если манифест не задаёт свой.
+    position: int = 0
 
 
 class Settings(BaseSettings):
@@ -56,30 +84,38 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str = ""
     bootstrap_admin_name: str = "Администратор платформы"
 
-    # Продукты установки: пустой адрес — продукта нет.
-    scanner_api_upstream: str = ""
-    vm_api_upstream: str = ""
-    grc_api_upstream: str = ""
-    scanner_events_secret: str = ""
-    vm_events_secret: str = ""
-    grc_events_secret: str = ""
+    # Продукты установки (id через запятую). Продукт из списка с пустым <ID>_API_UPSTREAM
+    # в кабинете не появляется.
+    platform_products: str = DEFAULT_PLATFORM_PRODUCTS
 
     manifest_poll_seconds: int = 60
     background_tasks: bool = Field(default=True)
 
+    def product_ids(self) -> list[str]:
+        """Все id из PLATFORM_PRODUCTS, в том числе без адреса."""
+        return parse_product_ids(self.platform_products)
+
     def products(self) -> list[ProductConfig]:
+        """Подключённые продукты: id из PLATFORM_PRODUCTS с непустым <ID>_API_UPSTREAM."""
+        env = _product_env()
         out: list[ProductConfig] = []
-        for pid in PRODUCT_IDS:
-            upstream = getattr(self, f"{pid}_api_upstream").strip()
+        for pos, pid in enumerate(self.product_ids()):
+            prefix = pid.upper()
+            upstream = env.get(f"{prefix}_API_UPSTREAM", "").strip()
             if upstream:
                 out.append(
                     ProductConfig(
                         id=pid,
                         api_upstream=upstream.rstrip("/"),
-                        events_secret=getattr(self, f"{pid}_events_secret"),
+                        events_secret=env.get(f"{prefix}_EVENTS_SECRET", ""),
+                        web_upstream=env.get(f"{prefix}_WEB_UPSTREAM", "").strip().rstrip("/"),
+                        position=pos,
                     )
                 )
         return out
+
+    def product(self, product_id: str) -> ProductConfig | None:
+        return next((p for p in self.products() if p.id == product_id), None)
 
     def secret_key_bytes(self) -> bytes:
         if not self.platform_secret_key:
@@ -88,6 +124,14 @@ class Settings(BaseSettings):
         if len(key) != 32:
             raise RuntimeError("PLATFORM_SECRET_KEY должен быть 32 байта в base64")
         return key
+
+
+def _product_env() -> dict[str, str]:
+    """Переменные продуктов: окружение процесса поверх .env (как у остальных настроек)."""
+    file_values = (
+        {k: v for k, v in dotenv_values(".env").items() if v is not None} if os.path.exists(".env") else {}
+    )
+    return {**file_values, **os.environ}
 
 
 @lru_cache

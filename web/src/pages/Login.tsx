@@ -47,7 +47,7 @@ export function LoginPage() {
           </span>
           <span>
             <div className="brand-title">Платформа</div>
-            <div className="brand-subtitle">Сканер · Устранение · Аттестация</div>
+            <div className="brand-subtitle">Единый кабинет продуктов</div>
           </span>
         </div>
         <h1 id="login-title">Вход</h1>

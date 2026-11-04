@@ -1,6 +1,6 @@
 # Ручная проверка этапа 1
 
-Стенд: `cp .env.example .env`, заполнить секреты, `COOKIE_SECURE=false`, затем `docker compose --profile fakes up --build`. Кабинет — http://127.0.0.1:18090/. Автотесты (`pytest`, `vitest`) проверяют то же на уровне кода; этот список — для приёмки глазами.
+Стенд: `cp .env.example .env`, заполнить секреты, `COOKIE_SECURE=false`, затем `docker compose --profile fakes up --build`. Кабинет — http://127.0.0.1:18090/. Автотесты (`pytest`, `vitest`) проверяют то же на уровне кода, а сквозной сценарий единого входа (разделы 1, 3.2 и выход) прогоняет Playwright — см. [`e2e/README.md`](../e2e/README.md); этот список — для приёмки глазами.
 
 ## 1. Вход и сессия
 

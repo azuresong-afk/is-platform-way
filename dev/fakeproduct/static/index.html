@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru" data-product="__PRODUCT__">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__TITLE__ — заглушка</title>
+  <link rel="stylesheet" href="./app.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <nav class="tabs" aria-label="Продукты">
+    <a href="/" data-tab="home">Главная</a>
+  </nav>
+  <main>
+    <h1>__TITLE__</h1>
+    <p class="note">Заглушка продукта для e2e: проверяет вход через платформу так же, как настоящий продукт (контракт v1.1, п. 2.4, 11).</p>
+    <dl>
+      <dt>Пользователь</dt><dd data-testid="user">…</dd>
+      <dt>Проект</dt><dd data-testid="project">…</dd>
+      <dt>Сводка</dt><dd data-testid="summary">…</dd>
+    </dl>
+    <button type="button" data-testid="logout">Выйти</button>
+  </main>
+</body>
+</html>

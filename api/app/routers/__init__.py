@@ -9,6 +9,7 @@ from . import (
     audit,
     auth,
     events,
+    notifications,
     products,
     projects,
 )
@@ -24,4 +25,5 @@ ROUTERS: list = [
     audit,
     assets,
     admin_keys,
+    notifications,
 ]

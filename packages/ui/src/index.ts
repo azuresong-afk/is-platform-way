@@ -12,6 +12,7 @@ export {
   getToken,
   loginUrl,
   logout,
+  onLogoutElsewhere,
   PLATFORM_API,
   redirectToLogin,
   refreshOnce,
@@ -22,12 +23,21 @@ export {
 export { formatDate, formatDateTime, formatNumber, formatPercent, initials } from "./lib/format";
 export { iconByName, registerIcons } from "./lib/icons";
 export { isSeverity, SEVERITIES, SEVERITY_LABELS, type Severity } from "./lib/severity";
-export { LEGACY_THEME_KEY, PROJECT_KEY, THEME_KEY, TOKEN_KEY } from "./lib/storage";
+export { LEGACY_THEME_KEY, LOGOUT_KEY, PROJECT_KEY, THEME_KEY, TOKEN_KEY } from "./lib/storage";
 
 export { Empty, type EmptyProps, ErrorAlert, type ErrorAlertProps, Loading } from "./components/Feedback";
 export { Kpi, type KpiProps } from "./components/Kpi";
 export { Layout, type LayoutProps, type LayoutUser, type NavItem, PageHead, type PageHeadProps } from "./components/Layout";
 export { ConfirmDanger, type ConfirmProps, Drawer, type DrawerProps, Modal, type ModalProps } from "./components/Overlay";
+export {
+  NotificationBell,
+  type NotificationBellProps,
+  type NotificationItem,
+  NotificationRow,
+  notificationsChanged,
+  NOTIFICATIONS_EVENT,
+  safeLink,
+} from "./components/NotificationBell";
 export { Pager, type PagerProps } from "./components/Pager";
 export { PlatformTabs, type PlatformTabsProps } from "./components/PlatformTabs";
 export { ProductTabs, type ProductTabsProps, type TabProduct } from "./components/ProductTabs";

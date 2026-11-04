@@ -12,7 +12,8 @@ import { SigningKeysPage } from "./pages/admin/SigningKeys";
 import { UsersPage } from "./pages/admin/Users";
 import { HomePage } from "./pages/Home";
 import { LoginPage } from "./pages/Login";
-import { AdminOnly, NotFoundPage, NotificationsPage } from "./pages/Misc";
+import { AdminOnly, NotFoundPage } from "./pages/Misc";
+import { NotificationsPage } from "./pages/Notifications";
 
 function Authed() {
   const auth = useAuth();

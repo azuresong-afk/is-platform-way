@@ -1,6 +1,7 @@
 import httpx
 
 from app import products
+from app.builtin_manifests import BUILTIN_MANIFESTS
 from app.models import Product
 from tests.helpers import bearer, login
 
@@ -26,7 +27,7 @@ def test_only_configured_products_exist(db):
 
 def test_refresh_reads_manifest_and_health(db):
     prod = db.get(Product, "vm")
-    manifest = {**products.DEFAULT_MANIFESTS["vm"], "version": "1.2.3", "title": "Устранение"}
+    manifest = {**BUILTIN_MANIFESTS["vm"], "version": "1.2.3", "title": "Устранение"}
     products.refresh_product(db, prod, _mock_client(manifest))
     assert prod.health == "ok" and prod.version == "1.2.3" and prod.manifest_fetched_at
 
@@ -70,7 +71,7 @@ def test_role_removed_from_manifest_is_dropped(client, db):
     db.commit()
     assert access.effective_roles(db, u) == {"vm": ["custom_commands"]}
     prod = db.get(Product, "vm")
-    m = dict(products.DEFAULT_MANIFESTS["vm"])
+    m = dict(BUILTIN_MANIFESTS["vm"])
     m["roles"] = {k: v for k, v in m["roles"].items() if k != "custom_commands"}
     products.refresh_product(db, prod, _mock_client(m))
     assert access.effective_roles(db, u) == {}
