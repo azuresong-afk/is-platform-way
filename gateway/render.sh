@@ -13,6 +13,11 @@ OUT="${NGINX_CONF_OUT:-/etc/nginx/conf.d/default.conf}"
 : "${SERVER_NAME:=_}"
 : "${TLS_CERT:=}"
 : "${TLS_KEY:=}"
+# Ограничение частоты входа с одного адреса (docs/SECURITY.md, п. 7): /auth/login и /auth/token.
+# Блокировка учётной записи после N неудач защищает одну запись; лимит по адресу — от перебора
+# паролей по многим записям и от того, чтобы чужие попытки блокировали администратора.
+: "${LOGIN_RATE_PER_MINUTE:=10}"
+: "${LOGIN_RATE_BURST:=30}"
 
 # Единый строгий CSP: всё только с этого origin, без inline-скриптов, без встраивания в чужие фреймы.
 CSP="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
@@ -80,6 +85,22 @@ env_value() { eval "printf '%s' \"\${$1:-}\""; }
 
 fail() { echo "gateway: $1" >&2; exit 1; }
 
+# Вход и выдача сервисного токена: свой location с limit_req, остальное — как у /api/platform/.
+auth_limited_location() {
+  path="$1"; v=$(var_name "/api/platform${path}")
+  cat <<L
+    location = /api/platform${path} {
+        limit_req zone=platform_auth burst=${LOGIN_RATE_BURST} nodelay;
+        error_page 429 = @auth_too_many;
+        client_max_body_size 64k;
+        set \$${v} ${PLATFORM_API_UPSTREAM};
+        rewrite ^ ${path} break;
+        proxy_pass \$${v};
+$(proxy_common)
+    }
+L
+}
+
 # id продукта: строчные латинские буквы и цифры, 2–20 символов, первая — буква (как в platform-api).
 valid_id() {
   case "$1" in
@@ -87,6 +108,10 @@ valid_id() {
   esac
   printf '%s' "$1" | grep -Eq '^[a-z][a-z0-9]{1,19}$'
 }
+
+printf '%s' "$LOGIN_RATE_PER_MINUTE" | grep -Eq '^[1-9][0-9]{0,5}$' \
+  || fail "LOGIN_RATE_PER_MINUTE: нужно целое число запросов в минуту, больше нуля"
+printf '%s' "$LOGIN_RATE_BURST" | grep -Eq '^[1-9][0-9]{0,5}$' || fail "LOGIN_RATE_BURST: нужно целое число больше нуля"
 
 PRODUCT_IDS=$(printf '%s' "$PLATFORM_PRODUCTS" | tr ',' ' ')
 for id in $PRODUCT_IDS; do
@@ -98,6 +123,9 @@ done
   echo "resolver ${RESOLVER} valid=10s ipv6=off;"
   echo "server_tokens off;"
   echo "map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }"
+  echo "limit_req_zone \$binary_remote_addr zone=platform_auth:10m rate=${LOGIN_RATE_PER_MINUTE}r/m;"
+  echo "limit_req_status 429;"
+  echo "limit_req_log_level warn;"
   echo
   if [ -n "$TLS_CERT" ]; then
     cat <<S
@@ -132,6 +160,18 @@ $(headers)
     location = /healthz { access_log off; add_header Content-Type text/plain; return 200 "ok\n"; }
 
 S
+  cat <<S
+    # Ответ на превышение лимита входа: JSON, как у API, — страница входа покажет текст.
+    location @auth_too_many {
+        default_type application/json;
+        add_header Retry-After 60 always;
+$(headers)
+        return 429 '{"detail":"Слишком много попыток входа с этого адреса. Повторите через минуту."}';
+    }
+
+S
+  auth_limited_location /auth/login
+  auth_limited_location /auth/token
   strip_location /api/platform/ "$PLATFORM_API_UPSTREAM"
 
   seen=" "

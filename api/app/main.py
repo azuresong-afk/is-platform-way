@@ -50,8 +50,9 @@ def create_app() -> FastAPI:
         title="Платформа — API",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url="/docs",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.api_docs else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if settings.api_docs else None,
     )
     app.include_router(health.router)
     for module in _routers():

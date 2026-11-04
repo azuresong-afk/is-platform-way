@@ -9,6 +9,7 @@ from .. import access, audit, products
 from ..db import aware, get_db
 from ..deps import Principal, client_ip, current_principal, require_admin
 from ..models import Product
+from ..security.links import is_safe_path
 
 router = APIRouter(tags=["products"])
 
@@ -29,9 +30,27 @@ PUBLIC_FIELDS = (
 )
 
 
+# Адреса, по которым оболочка ходит с токеном пользователя или ведёт пользователя.
+# Принимаются только пути этого origin (контракт v1.1, п. 5.1; docs/SECURITY.md, п. 9);
+# адреса API — только под /api/<id>/ своего продукта.
+_PATH_FIELDS = ("base_path",)
+_API_FIELDS = ("api_base", "search_url", "summary_url", "health_url")
+
+
+def _url_ok(prod_id: str, field: str, value: object) -> bool:
+    if not is_safe_path(value):
+        return False
+    return field not in _API_FIELDS or str(value).startswith(f"/api/{prod_id}/")
+
+
 def _public(prod: Product) -> dict:
     m = prod.manifest or {}
     out = {k: m.get(k) for k in PUBLIC_FIELDS if k in m}
+    for field in (*_PATH_FIELDS, *_API_FIELDS):
+        if field in out and not _url_ok(prod.id, field, out[field]):
+            del out[field]
+    if "base_path" not in out:
+        out["base_path"] = f"/{prod.id}/"
     out["id"] = prod.id
     out["title"] = m.get("title") or prod.title
     out["health"] = prod.health

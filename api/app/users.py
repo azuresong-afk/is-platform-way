@@ -68,8 +68,11 @@ def check_login(db: Session, username: str, password: str) -> tuple[LoginResult,
         passwords.verify_password(password, None)
         return LoginResult.BAD_CREDENTIALS, user
     if not user.is_active:
-        passwords.verify_password(password, None)
-        return LoginResult.INACTIVE, user
+        # «Учётная запись отключена» — только при верном пароле, иначе ответ выдаёт,
+        # что такой логин существует (docs/SECURITY.md, п. 1).
+        if passwords.verify_password(password, user.password_hash):
+            return LoginResult.INACTIVE, user
+        return LoginResult.BAD_CREDENTIALS, user
     if is_locked(user):
         passwords.verify_password(password, None)
         return LoginResult.LOCKED, user
