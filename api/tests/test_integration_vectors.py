@@ -139,6 +139,9 @@ DATA_FIELDS = {
     "vm.remediation.verified": {"ticket_id", "run_id", "result"},
     "grc.document.approval_requested": {"document_id", "title", "system_id", "author_sub"},
     "grc.assessment.updated": {"system_id", "title", "percent", "status"},
+    "platform.keys.rotated": {"kid", "revoked"},
+    "platform.project.updated": {"project_id", "name", "status"},
+    "platform.user.blocked": {"sub"},
     "audit.recorded": {"time", "actor", "action", "object", "result", "ip", "details"},
 }  # fmt: skip
 
@@ -146,8 +149,11 @@ DATA_FIELDS = {
 def test_event_envelopes():
     envelopes = _load("events.json")["envelopes"]
     assert {e["type"] for e in envelopes} == set(DATA_FIELDS)
+    from app.events import Envelope
+
     ids = set()
     for e in envelopes:
+        Envelope.model_validate(e)  # схема шины событий платформы
         assert {"id", "type", "source", "time", "project_id", "subject", "data"} <= set(e)
         assert e["type"].startswith(e["source"] + ".") or e["type"] == "audit.recorded"
         assert DATA_FIELDS[e["type"]] <= set(e["data"]), e["type"]

@@ -407,6 +407,23 @@ def sample_events() -> list[dict]:
             },
         ),
         env(
+            10,
+            "platform.keys.rotated",
+            "platform",
+            f"key/{KID_NEXT}",
+            # Срочная смена с отзывом: продукт сбрасывает кэш JWKS и не принимает revoked.
+            {"kid": KID_NEXT, "revoked": [KID_ACTIVE]},
+            project_id=None,
+        ),
+        env(
+            11,
+            "platform.project.updated",
+            "platform",
+            f"project/{PROJECT_A}",
+            {"project_id": PROJECT_A, "name": "Аудит ООО «Ромашка», 2026", "status": "archived"},
+        ),
+        env(12, "platform.user.blocked", "platform", f"user/{USER_SUB}", {"sub": USER_SUB}, project_id=None),
+        env(
             8,
             "audit.recorded",
             "scanner",

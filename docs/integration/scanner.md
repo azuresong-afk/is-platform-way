@@ -53,7 +53,7 @@
         {"id":"assets","label":"Активы","path":"/scanner/assets","icon":"server","perm":"view"}],
  "search_url":"/api/scanner/search","health_url":"/api/scanner/health/ready",
  "summary_url":"/api/scanner/summary",
- "events":{"webhook":"/events/platform","subscribe":["vm.remediation.verified"]}}
+ "events":{"webhook":"/events/platform","subscribe":["vm.remediation.verified","platform.keys.rotated","platform.project.updated"]}}
 ```
 
 `version` — версия сборки «Сканера»; платформа показывает её на экране «Продукты».
