@@ -18,3 +18,4 @@ test-results/
 storybook-static/
 backups/
 dist-showcase/
+deploy/tls/*.pem

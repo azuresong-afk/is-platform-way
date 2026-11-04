@@ -1,0 +1,117 @@
+# «Платформа»: шлюз, API, оболочка, БД. Запуск: cp .env.example .env && docker compose up --build
+# Заглушки продуктов для разработки: docker compose --profile fakes up --build
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    depends_on:
+      platform-api:
+        condition: service_healthy
+      platform-web:
+        condition: service_healthy
+    environment:
+      PLATFORM_API_UPSTREAM: http://platform-api:8000
+      PLATFORM_WEB_UPSTREAM: http://platform-web:8080
+      SCANNER_API_UPSTREAM: ${SCANNER_API_UPSTREAM:-}
+      SCANNER_WEB_UPSTREAM: ${SCANNER_WEB_UPSTREAM:-}
+      VM_API_UPSTREAM: ${VM_API_UPSTREAM:-}
+      VM_WEB_UPSTREAM: ${VM_WEB_UPSTREAM:-}
+      GRC_API_UPSTREAM: ${GRC_API_UPSTREAM:-}
+      GRC_WEB_UPSTREAM: ${GRC_WEB_UPSTREAM:-}
+      SERVER_NAME: ${SERVER_NAME:-_}
+      CLIENT_MAX_BODY: ${CLIENT_MAX_BODY:-20m}
+      BDU_UPLOAD_MAX_BODY: ${BDU_UPLOAD_MAX_BODY:-512m}
+      TLS_CERT: ${TLS_CERT:-}
+      TLS_KEY: ${TLS_KEY:-}
+    volumes:
+      - ${TLS_DIR:-./deploy/tls}:/etc/nginx/tls:ro
+    ports:
+      - "${PLATFORM_GATEWAY_BIND:-127.0.0.1}:${PLATFORM_GATEWAY_PORT:-18090}:8080"
+      - "${PLATFORM_GATEWAY_BIND:-127.0.0.1}:${PLATFORM_GATEWAY_TLS_PORT:-18443}:8443"
+    logging: *logging
+
+  platform-api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${PLATFORM_DB_USER:-platform}:${PLATFORM_DB_PASSWORD:?задайте PLATFORM_DB_PASSWORD}@db:5432/${PLATFORM_DB_NAME:-platform}
+      PLATFORM_SECRET_KEY: ${PLATFORM_SECRET_KEY:?задайте PLATFORM_SECRET_KEY}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Администратор платформы}
+      LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-5}
+      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+      SCANNER_API_UPSTREAM: ${SCANNER_API_UPSTREAM:-}
+      VM_API_UPSTREAM: ${VM_API_UPSTREAM:-}
+      GRC_API_UPSTREAM: ${GRC_API_UPSTREAM:-}
+      SCANNER_EVENTS_SECRET: ${SCANNER_EVENTS_SECRET:-}
+      VM_EVENTS_SECRET: ${VM_EVENTS_SECRET:-}
+      GRC_EVENTS_SECRET: ${GRC_EVENTS_SECRET:-}
+    ports:
+      - "127.0.0.1:${PLATFORM_API_PORT:-18010}:8000"
+    logging: *logging
+
+  platform-web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    logging: *logging
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PLATFORM_DB_NAME:-platform}
+      POSTGRES_USER: ${PLATFORM_DB_USER:-platform}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD:?задайте PLATFORM_DB_PASSWORD}
+    volumes:
+      - platform-db:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${PLATFORM_DB_PORT:-15440}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+
+  # --- заглушки продуктов (профиль fakes) ---
+  fake-scanner:
+    profiles: [fakes]
+    build: { context: ./dev, args: { PRODUCT: fake-scanner } }
+    environment:
+      PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
+      PLATFORM_EVENTS_SECRET: ${SCANNER_EVENTS_SECRET:-}
+    logging: *logging
+
+  fake-vm:
+    profiles: [fakes]
+    build: { context: ./dev, args: { PRODUCT: fake-vm } }
+    environment:
+      PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
+      PLATFORM_EVENTS_SECRET: ${VM_EVENTS_SECRET:-}
+    logging: *logging
+
+  fake-grc:
+    profiles: [fakes]
+    build: { context: ./dev, args: { PRODUCT: fake-grc } }
+    environment:
+      PLATFORM_JWKS_URL: http://platform-api:8000/.well-known/jwks.json
+      PLATFORM_EVENTS_SECRET: ${GRC_EVENTS_SECRET:-}
+      FAKE_DELAY_SECONDS: ${FAKE_GRC_DELAY_SECONDS:-0}
+    logging: *logging
+
+volumes:
+  platform-db:
