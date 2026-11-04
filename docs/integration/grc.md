@@ -15,6 +15,7 @@
 | 5 | Outbox и события `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — с `notify` | `vectors/hmac.json`, `vectors/events.json` |
 | 6 | Фронтенд: `VITE_BASE=/grc/`, `VITE_API_BASE=/api/grc`, 401/403, выход отовсюду (`platform.logout`), `@platform/ui`, угловатые токены | стенд платформы |
 | 7 | (необязательно) подписка на `scanner.run.finished` и чтение соответствия из «Сканера» сервисным токеном | `vectors/hmac.json` |
+| 8 | Комплект: переменные п. 12 (`DATABASE_URL`, `PLATFORM_*`), миграции и восстановление без прав суперпользователя | README, п. 1–1.1 |
 
 ## 1. Вход, права, проекты
 
@@ -91,7 +92,7 @@
 
 Если «Аттестация» использует результаты проверок соответствия «Сканера» (`GET /runs/{id}/compliance?profile=fstec-117&level=К2`):
 
-- вызовы — сервисным токеном (`POST {PLATFORM_API_URL}/auth/token`, как в [`vm.md`](vm.md), п. 4) учётной записи с ролью `auditor` в «Сканере»; переменные `PLATFORM_SCANNER_CLIENT_ID`, `PLATFORM_SCANNER_CLIENT_SECRET`;
+- вызовы — сервисным токеном (`POST {PLATFORM_URL}/auth/token`, как в [`vm.md`](vm.md), п. 4) учётной записи с ролью `auditor` в «Сканере»; переменные `PLATFORM_SCANNER_CLIENT_ID`, `PLATFORM_SCANNER_CLIENT_SECRET`;
 - подписка на `scanner.run.finished` — сигнал перечитать результат прогона;
 - сопоставление «мера → техническая проверка» в «Сканере» ещё не сверено методистом: результат «Сканера» — подсказка аттестатору, а не автоматическая отметка меры.
 

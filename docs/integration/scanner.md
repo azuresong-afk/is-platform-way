@@ -15,6 +15,7 @@
 | 5 | Outbox и события `scanner.run.finished`, `scanner.asset.upserted/deleted`, `audit.recorded` | `vectors/hmac.json`, экран «События» платформы |
 | 6 | Webhook `/events/platform`, подписка на `vm.remediation.verified` | `vectors/hmac.json` (`platform_to_subscriber`) |
 | 7 | Фронтенд: `VITE_BASE=/scanner/`, `VITE_API_BASE=/api/scanner`, 401/403, выход отовсюду (`platform.logout`) по п. 2.4, `@platform/ui`, угловатые токены | стенд платформы |
+| 8 | Комплект: переменные п. 12 (`DATABASE_URL`, `PLATFORM_*`), миграции и восстановление без прав суперпользователя | README, п. 1–1.1 |
 
 ## 1. Вход и права
 

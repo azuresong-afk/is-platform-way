@@ -16,6 +16,7 @@
 | 6 | Вызовы «Сканера» сервисным токеном из `POST /api/platform/auth/token` | вектор `service_vm_to_scanner` |
 | 7 | Webhook `/events/platform` для событий «Сканера» | `vectors/hmac.json` |
 | 8 | Фронтенд: `VITE_BASE=/vm/`, `VITE_API_BASE=/api/vm`, 401/403, выход отовсюду (`platform.logout`), `@platform/ui`, угловатые токены | стенд платформы |
+| 9 | Комплект: переменные п. 12 (`DATABASE_URL`, `PLATFORM_*`), миграции и восстановление без прав суперпользователя | README, п. 1–1.1 |
 
 ## 1. Вход, права, проекты
 
@@ -77,7 +78,7 @@
 Получение токена:
 
 ```http
-POST {PLATFORM_API_URL}/auth/token
+POST {PLATFORM_URL}/auth/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=client_credentials&client_id=vm-to-scanner&client_secret=…
@@ -97,7 +98,7 @@ grant_type=client_credentials&client_id=vm-to-scanner&client_secret=…
 - **Находка** связывается с заявкой по `dedup_key` (= sha256(host|port|vuln_id|module), стабилен между прогонами) — это `finding_keys[]` в `vm.ticket.created`.
 - **Действие исправления** — по `key` из `GET /runs/{id}/fixes` (стабилен, пока не меняется состав пакетов): заявка может покрывать одно действие на несколько хостов.
 - **Подтверждение исправления.** Отсутствие находки в повторном прогоне считается исправлением **только если** в `GET /runs/{id}/coverage` хост+модуль этого прогона — `completed`. Иначе `result: "not_verified"`, а не `fixed`.
-- **Активы** — `GET {PLATFORM_API_URL}/projects/{id}/assets` с токеном пользователя (сводный реестр платформы, шаг 2.4 платформы) или события `scanner.asset.*`; в режиме `local` — напрямую из «Сканера». Ключ сопоставления — `(project_id, address)`.
+- **Активы** — `GET {PLATFORM_URL}/projects/{id}/assets` с токеном пользователя (сводный реестр платформы, шаг 2.4 платформы) или события `scanner.asset.*`; в режиме `local` — напрямую из «Сканера». Ключ сопоставления — `(project_id, address)`.
 
 ## 5. События
 

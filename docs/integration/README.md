@@ -20,16 +20,26 @@
 |---|---|---|
 | `AUTH_MODE` | `local` (по умолчанию) \| `platform` | `local` — свой вход и свой справочник проектов, как сейчас; `platform` — всё ниже |
 
-Переменные режима `platform` (имена — рекомендация; главное, чтобы они были в `.env.example` продукта с комментариями):
+Переменные режима `platform` — те, что передаёт комплект (п. 12 контракта); продукт обязан их понимать и описать в своём `.env.example`:
 
-| Переменная | Пример | Зачем |
+| Переменная | Значение в комплекте | Зачем |
 |---|---|---|
-| `PLATFORM_JWKS_URL` | `http://platform-api:8000/.well-known/jwks.json` | открытые ключи для проверки токенов (внутренний адрес, без шлюза) |
-| `PLATFORM_ISSUER` | `platform` | ожидаемый `iss` |
-| `PLATFORM_API_URL` | `http://platform-api:8000` | `GET /projects/{id}`, `POST /auth/token`, `POST /events` |
-| `PLATFORM_EVENTS_SECRET` | 32+ случайных байта | HMAC событий; то же значение, что `SCANNER_EVENTS_SECRET` / `VM_…` / `GRC_…` в `.env` платформы |
+| `AUTH_MODE` | `platform` | режим |
+| `PLATFORM_PRODUCT_ID` | `scanner` / `vm` / `grc` | свой id: `aud`, `products.<id>`, `X-Platform-Product` |
+| `DATABASE_URL` | `postgresql+psycopg://<id>:<пароль>@db:5432/<id>` | своя база в общем кластере (формат SQLAlchemy) |
+| `PLATFORM_URL` | `http://platform-api:8000` | API платформы внутри сети, без префикса `/api/platform`: `GET /projects/{id}`, `POST /auth/token` |
+| `PLATFORM_JWKS_URL` | `http://platform-api:8000/.well-known/jwks.json` | открытые ключи для проверки токенов |
+| `PLATFORM_EVENTS_URL` | `http://platform-api:8000/events` | отправка событий |
+| `PLATFORM_EVENTS_SECRET` | значение `<ID>_EVENTS_SECRET` из `.env` комплекта | HMAC событий в обе стороны |
 
-Внутри контура платформы продукт ходит в platform-api напрямую по `PLATFORM_API_URL`, без префикса `/api/platform` (его отрезает шлюз только для браузера).
+`iss` токенов — всегда `platform`. Префикс `/api/platform` отрезает шлюз только для браузера; продукт внутри сети ходит в platform-api напрямую.
+
+### 1.1. Запуск в составе комплекта (п. 12)
+
+- Продукт поставляется образом API (`<id>-app`, слушает `:8000`, `HEALTHCHECK` по `/health/ready`) и, по желанию, web-образом (nginx-unprivileged `:8080`, SPA собрана с `VITE_BASE=/<id>/`). Подключается строками `<ID>_IMAGE`, `<ID>_WEB_IMAGE`, `<ID>_DB_PASSWORD`, `<ID>_EVENTS_SECRET` в `.env` комплекта, без правки compose-файлов. Свои секреты и лимиты продукт читает из `deploy/env/<id>.env`.
+- **База без прав суперпользователя.** Пользователь `<id>` — владелец базы `<id>`, без `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`, `BYPASSRLS`. Миграции выполняются им при старте `app`; расширения — только доверенные (`pgcrypto`, `uuid-ossp`, `citext` и т. п.), недоверенное — сообщить, его добавит `deploy/db/provision.sh`. Не создавать других ролей и баз.
+- Триггер append-only журнала аудита создаётся владельцем базы — это работает без суперпользователя. Не используйте `SECURITY DEFINER`-функции, принадлежащие `postgres`, и `ALTER SYSTEM`: восстановление из копии (`deploy/restore.sh`) идёт от имени `<id>`.
+- Проверка: прогнать миграции на чистом PostgreSQL 16 пользователем `CREATE ROLE <id> LOGIN PASSWORD '…'` (без других атрибутов), владельцем базы `<id>`; затем `pg_dump` → восстановление тем же пользователем.
 
 ## 2. Проверка токена (п. 2.1–2.3)
 
@@ -87,7 +97,7 @@ if not roles:
 ## 3. Проекты (п. 3.1)
 
 - В режиме `platform` проект создаётся только в платформе. Продукт хранит у себя `platform_project_id` (uuid) и не даёт создавать проекты через свой API и интерфейс.
-- Проект приходит в запросе как `?project=<uuid>` (или в пути). Неизвестный продукту uuid — создать «тень» проекта по данным `GET {PLATFORM_API_URL}/projects/{id}` **с токеном пользователя, который сделал запрос** (сервисный токен туда не подходит: его `aud` — только ваш продукт).
+- Проект приходит в запросе как `?project=<uuid>` (или в пути). Неизвестный продукту uuid — создать «тень» проекта по данным `GET {PLATFORM_URL}/projects/{id}` **с токеном пользователя, который сделал запрос** (сервисный токен туда не подходит: его `aud` — только ваш продукт).
 - Ответ платформы: `{id, name, client, contract_ref, period_from, period_to, status, created_at, archived_at}`. Кэшируйте до 5 минут или обновляйте по событию `platform.project.updated {project_id, name, status}`.
 - Архивный проект (`status: "archived"`) — только чтение: изменяющие запросы отвечают `409 {"detail":"project_archived"}`.
 
@@ -131,7 +141,7 @@ if not roles:
 2. Фоновая задача отправляет записи outbox:
 
 ```http
-POST {PLATFORM_API_URL}/events
+POST {PLATFORM_EVENTS_URL}
 Content-Type: application/json
 X-Platform-Product: vm
 X-Event-Id: 7c9e6679-7425-40de-944b-e07fc1f90004
@@ -239,6 +249,7 @@ def test_platform_jwt(client_with_jwks, case):
 ## 10. Готовность к включению в платформу
 
 - [ ] `AUTH_MODE=local` работает как раньше (регресс-тесты зелёные).
+- [ ] Продукт понимает переменные комплекта (п. 1); миграции и восстановление из копии проходят пользователем БД без прав суперпользователя (п. 1.1).
 - [ ] Все векторы `jwt.json` и `hmac.json` проходят в тестах продукта.
 - [ ] Теневые пользователи и теневые проекты создаются при первом обращении; создание проектов в режиме `platform` запрещено.
 - [ ] `GET /manifest`, `/health/ready`, `/summary`, `/search` отвечают по контракту.
