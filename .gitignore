@@ -26,3 +26,6 @@ deploy/env/*.env
 !deploy/env/example.env
 deploy/docker-compose.suite.override.yml
 backups/
+
+# Офлайн-пакеты (deploy/bundle.sh create)
+bundles/

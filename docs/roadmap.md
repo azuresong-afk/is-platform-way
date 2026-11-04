@@ -36,7 +36,7 @@ packages/ui/    @platform/ui
 gateway/        nginx: шаблон, render.sh, Dockerfile
 dev/            заглушки продуктов
 docs/           roadmap, контракт v1.1, integration/*, INSTALL, TESTING, MIGRATION
-deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose.suite.yml — в корне)
+deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh, bundle.sh (docker-compose.suite.yml — в корне)
 ```
 
 **[выбор]** npm workspaces (`web`, `packages/ui`) без pnpm/turbo: меньше инструментов в закрытом контуре.
