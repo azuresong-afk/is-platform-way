@@ -79,6 +79,48 @@ export interface ServiceAccount {
   last_used_at: string | null;
 }
 
+export type DeliveryStatus = "ok" | "pending" | "failed" | "dead";
+
+export interface BusEvent {
+  id: string;
+  type: string;
+  source: string;
+  time: string;
+  received_at: string;
+  project_id: string | null;
+  subject: string;
+  delivery: DeliveryStatus | "none";
+  deliveries_total: number;
+}
+
+export interface BusDelivery {
+  id: string;
+  subscription_id: string;
+  product_id: string;
+  status: DeliveryStatus;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  last_status_code: number | null;
+  delivered_at: string | null;
+}
+
+export interface BusEventDetail extends BusEvent {
+  data: Record<string, unknown>;
+  notify: { users: string[]; title: string; link?: string | null } | null;
+  deliveries: BusDelivery[];
+}
+
+export interface Subscription {
+  id: string;
+  product_id: string;
+  webhook_path: string;
+  types: string[];
+  is_active: boolean;
+  pending: number;
+  dead: number;
+}
+
 export interface Member {
   user_id: string;
   username: string;
