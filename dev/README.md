@@ -22,3 +22,7 @@ PLATFORM_JWKS_URL=http://127.0.0.1:18010/.well-known/jwks.json \
 Переменные: `PLATFORM_JWKS_URL`, `PLATFORM_EVENTS_SECRET`, `FAKE_DELAY_SECONDS` (задержка `/summary` и `/search`), `FAKE_FAIL=1` (ответ 500 — проверка карточки «недоступен»).
 
 Тесты: `cd dev && pytest`.
+
+## Учебная БД «Сканера» и репетиция перехода
+
+`scanner-legacy/seed.sql` — БД «Сканера» до перехода на платформу (пользователи, надбавки, проекты, прогоны). Поднимается профилем `migration`: `docker compose --profile fakes --profile migration up -d`. `scanner-legacy/rehearse.sh` проходит всю процедуру [`docs/MIGRATION.md`](../docs/MIGRATION.md) на отдельном стенде и сверяет результат каждого шага.

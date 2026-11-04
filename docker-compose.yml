@@ -113,5 +113,22 @@ services:
       FAKE_DELAY_SECONDS: ${FAKE_GRC_DELAY_SECONDS:-0}
     logging: *logging
 
+  # --- учебная БД «Сканера» до перехода (профиль migration, docs/MIGRATION.md) ---
+  scanner-legacy-db:
+    profiles: [migration]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: scanner
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner-legacy-pass
+    volumes:
+      - ./dev/scanner-legacy/seed.sql:/docker-entrypoint-initdb.d/10-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner -d scanner"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+
 volumes:
   platform-db:

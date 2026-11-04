@@ -55,6 +55,11 @@ def import_scanner(args: argparse.Namespace) -> int:
     print("\nИтог" + ("" if args.apply else " (пробный запуск, ничего не записано; добавьте --apply)") + ":")
     for key, value in report.summary().items():
         print(f"  {key:28} {value}")
+    if report.users_updated:
+        print(
+            "\nУже есть в платформе, получат роли «Сканера» (пароль и профиль платформы не меняются): "
+            + ", ".join(report.users_updated)
+        )
     if report.scanner_admins:
         print("\nАдминистраторы «Сканера»: " + ", ".join(report.scanner_admins))
         if not args.grant_platform_admin:

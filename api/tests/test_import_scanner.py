@@ -198,7 +198,13 @@ def test_missing_users_table_is_reported(tmp_path):
 
 def test_cli_dry_run_writes_nothing(client, db, source_url, tmp_path, capsys):
     assert cli_main(["import-scanner", "--source", source_url]) == 0
-    assert "пробный запуск" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert "пробный запуск" in printed
+    # логин «admin» уже занят администратором платформы — оператор должен это увидеть до --apply
+    assert (
+        "Уже есть в платформе, получат роли «Сканера» (пароль и профиль платформы не меняются): admin"
+        in printed
+    )
     db.expire_all()
     assert db.scalar(select(User).where(User.username == "ivanov")) is None
 
