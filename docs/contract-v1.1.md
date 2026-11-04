@@ -17,7 +17,7 @@
 | 5.1 | В манифесте новые поля: `summary_url`, `events`, `roles` включает надбавки | Главная, подписки |
 | 5.2 | Внутренний адрес манифеста для платформы | опрос без шлюза |
 | 6.1 | Подпись событий: секрет на продукт, заголовки `X-Platform-Product`, `X-Event-Id` | проверка источника |
-| 6.2 | Схемы `data` для минимального набора событий | сводный реестр и журнал |
+| 6.2 | Схемы `data` для минимального набора событий; тип `grc.document.approval_requested` | сводный реестр и журнал; уведомление утверждающих |
 | 6.3 | Необязательное поле `notify` в конверте | центр уведомлений |
 | 6.4 | Доставка событий подписчикам: подпись, ответы, повторы | |
 | 7.1 | Формат ответа `search_url` | Ctrl+K |
@@ -155,6 +155,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 | `vm.ticket.status_changed` | `{ticket_id, from, to, assignee_sub}` |
 | `vm.remediation.verified` | `{ticket_id, run_id, result: fixed|not_fixed|not_verified}` |
 | `grc.assessment.updated` | `{system_id, title, percent, status}` |
+| `grc.document.approval_requested` | `{document_id, title, system_id, author_sub}`; `notify` — пользователям с ролью `approve` в проекте, кроме автора |
 | `audit.recorded` | `{time, actor:{sub,name}, action, object, result: success|failure|denied, ip, details}` (`project_id` — в конверте) |
 
 Дополнительные поля в `data` допустимы и сохраняются.
@@ -271,6 +272,8 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 
 ## Что сделать каждому продукту
 
+Подробно, с примерами запросов и тестовыми векторами, — [`docs/integration/`](integration/README.md).
+
 ### «Сканер» (`scanner`)
 
 1. Режим `AUTH_MODE=platform`: проверка JWT по JWKS (п. 2.1–2.3), теневые пользователи по `sub`, 403 `no_product_roles`/`no_project_access`.
@@ -296,5 +299,5 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 1–2. Как у «Сканера».
 3. Манифест с ролями `admin, methodologist, assessor, approve, viewer`.
 4. `GET /summary` (п. 10), `GET /search`.
-5. События `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — с `notify` пользователям с ролью `approve`.
+5. События `grc.assessment.updated`, `audit.recorded`; «документ ждёт утверждения» — событие `grc.document.approval_requested` с `notify` пользователям с ролью `approve`.
 6. Фронтенд — как у «Сканера», `VITE_BASE=/grc/`, угловатые токены по п. 9.1.
