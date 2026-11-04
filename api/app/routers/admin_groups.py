@@ -114,6 +114,11 @@ def patch_group(
 ):
     g = _get(db, gid)
     g.name, g.description = body.name, body.description
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Команда с таким названием уже есть") from exc
     _audit(db, p, request, "group.update", g)
     db.commit()
     return group_out(db, g)

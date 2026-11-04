@@ -11,8 +11,10 @@ import {
 } from "@platform/ui";
 import { Lock, Plus, Search, Users } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
-import { type AdminProduct, type AdminUser, errorText, paged, type Project, send, API, get } from "../../api";
+import { type AdminProduct, type AdminUser, errorText, paged, type Project, send, API, get, type Team } from "../../api";
+import { RoleMatrix, rolesBody } from "../../components/RoleMatrix";
 
 const LIMIT = 50;
 
@@ -23,6 +25,7 @@ export function UsersPage() {
   const [error, setError] = useState<unknown>(null);
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -42,6 +45,10 @@ export function UsersPage() {
     get<AdminProduct[]>("/admin/products").then(setProducts, () => setProducts([]));
     get<Project[]>("/admin/projects?limit=500").then(setProjects, () => setProjects([]));
   }, []);
+  // Команды перечитываются вместе со списком: состав мог поменяться на соседнем экране.
+  useEffect(() => {
+    get<Team[]>("/admin/groups").then(setTeams, () => setTeams([]));
+  }, [data]);
 
   const roleLabel = (pid: string, role: string) => products.find((p) => p.id === pid)?.manifest.roles?.[role] ?? role;
   const productTitle = (pid: string) => products.find((p) => p.id === pid)?.title ?? pid;
@@ -146,6 +153,7 @@ export function UsersPage() {
           user={current}
           products={products}
           projects={projects}
+          teams={teams}
           onClose={() => setOpenId(null)}
           onChanged={load}
         />
@@ -220,11 +228,12 @@ interface DrawerProps {
   user: AdminUser;
   products: AdminProduct[];
   projects: Project[];
+  teams: Team[];
   onClose: () => void;
   onChanged: () => void;
 }
 
-function UserDrawer({ user, products, projects, onClose, onChanged }: DrawerProps) {
+function UserDrawer({ user, products, projects, teams, onClose, onChanged }: DrawerProps) {
   const auth = useAuth();
   const self = auth.user?.id === user.id;
   const [roles, setRoles] = useState<Record<string, string[]>>(user.own_roles);
@@ -244,13 +253,17 @@ function UserDrawer({ user, products, projects, onClose, onChanged }: DrawerProp
     }
   };
 
-  const toggleRole = (pid: string, role: string) =>
-    setRoles((r) => {
-      const cur = r[pid] ?? [];
-      return { ...r, [pid]: cur.includes(role) ? cur.filter((x) => x !== role) : [...cur, role] };
-    });
-
-  const inherited = (pid: string, role: string) => (user.roles[pid] ?? []).includes(role) && !(user.own_roles[pid] ?? []).includes(role);
+  const myTeams = teams.filter((t) => user.groups.includes(t.id));
+  // Эффективная роль без своей — пришла из команды; называем команды, если они уже загружены.
+  const inheritedFrom = (pid: string, role: string) => {
+    if (!(user.roles[pid] ?? []).includes(role) || (user.own_roles[pid] ?? []).includes(role)) return null;
+    const names = myTeams.filter((t) => (t.roles[pid] ?? []).includes(role)).map((t) => `«${t.name}»`);
+    return names.length ? `из команды ${names.join(", ")}` : "из команды";
+  };
+  const teamProject = (projectId: string) => {
+    const names = myTeams.filter((t) => t.projects.includes(projectId)).map((t) => `«${t.name}»`);
+    return names.length ? `из команды ${names.join(", ")}` : null;
+  };
 
   return (
     <Drawer open title={user.display_name || user.username} onClose={onClose}>
@@ -282,27 +295,25 @@ function UserDrawer({ user, products, projects, onClose, onChanged }: DrawerProp
         </div>
       </dl>
 
-      <h3>Роли в продуктах</h3>
-      {products.map((p) => (
-        <fieldset key={p.id} className="card card-pad" style={{ gap: 8 }} disabled={self}>
-          <legend className="kpi-label" style={{ padding: "0 4px" }}>
-            {p.title}
-          </legend>
-          {Object.entries(p.manifest.roles ?? {}).map(([role, label]) => (
-            <label key={role} className="checkbox">
-              <input
-                type="checkbox"
-                checked={(roles[p.id] ?? []).includes(role) || inherited(p.id, role)}
-                disabled={inherited(p.id, role)}
-                onChange={() => toggleRole(p.id, role)}
-              />
-              {label}
-              {inherited(p.id, role) && <small>через команду</small>}
-              {(p.manifest.admin_roles ?? []).includes(role) && <span className="pill pill-muted">администрирование продукта</span>}
-            </label>
+      <h3>Команды</h3>
+      {user.groups.length === 0 ? (
+        <p className="muted">
+          Не состоит в командах. Состав команд меняется на экране <Link to="/admin/groups">Команды</Link>.
+        </p>
+      ) : (
+        <ul className="form" style={{ listStyle: "none", padding: 0, margin: 0 }} aria-label="Команды пользователя">
+          {myTeams.map((t) => (
+            <li key={t.id}>
+              <Link to={`/admin/groups?open=${t.id}`}>{t.name}</Link>
+              {t.description && <span className="muted"> — {t.description}</span>}
+            </li>
           ))}
-        </fieldset>
-      ))}
+        </ul>
+      )}
+
+      <h3>Роли в продуктах</h3>
+      <p className="muted">Отмечены эффективные роли: свои и полученные из команд. Роль из команды снимается в самой команде.</p>
+      <RoleMatrix products={products} value={roles} onChange={setRoles} disabled={self} inheritedFrom={inheritedFrom} />
       <div className="actions">
         <button
           type="button"
@@ -310,7 +321,7 @@ function UserDrawer({ user, products, projects, onClose, onChanged }: DrawerProp
           disabled={self}
           onClick={() =>
             run(
-              () => send("PUT", `/admin/users/${user.id}/roles`, { products: Object.fromEntries(products.map((p) => [p.id, roles[p.id] ?? []])) }),
+              () => send("PUT", `/admin/users/${user.id}/roles`, rolesBody(products, roles)),
               "Роли сохранены. Изменения вступят в силу при следующем обновлении токена, не позже 15 минут.",
             )
           }
@@ -335,6 +346,7 @@ function UserDrawer({ user, products, projects, onClose, onChanged }: DrawerProp
               />
               {p.name}
               {p.status === "archived" && <span className="pill pill-muted">Архив</span>}
+              {teamProject(p.id) && <small className="muted">{teamProject(p.id)}</small>}
             </label>
           ))}
         <div className="actions">
