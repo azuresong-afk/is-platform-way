@@ -19,3 +19,9 @@ export const PROJECT_STATUS: Record<string, { label: string; pill: string }> = {
   active: { label: "Активный", pill: "pill-ok" },
   archived: { label: "Архив", pill: "pill-muted" },
 };
+
+export const AUDIT_RESULT: Record<string, { label: string; pill: string }> = {
+  success: { label: "Успех", pill: "pill-ok" },
+  failure: { label: "Ошибка", pill: "pill-warn" },
+  denied: { label: "Отказ", pill: "pill-danger" },
+};

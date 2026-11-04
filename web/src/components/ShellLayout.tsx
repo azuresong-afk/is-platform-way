@@ -17,6 +17,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Layers3,
+  ScrollText,
   Users,
 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
@@ -96,6 +97,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
       list.push(
         { id: "go-users", label: "Перейти в Пользователи и доступ", href: "/admin/users" },
         { id: "go-projects", label: "Перейти в Проекты", href: "/admin/projects" },
+        { id: "go-audit", label: "Перейти в Журнал аудита", href: "/admin/audit" },
       );
     }
     return list;
@@ -110,6 +112,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         { to: "/admin/projects", label: "Проекты", icon: FolderKanban },
         { to: "/admin/products", label: "Продукты", icon: Boxes },
         { to: "/admin/service-accounts", label: "Сервисные учётные записи", icon: KeyRound },
+        { to: "/admin/audit", label: "Журнал аудита", icon: ScrollText },
       ]
     : [];
 
