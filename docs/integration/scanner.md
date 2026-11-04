@@ -31,7 +31,7 @@
 1. если есть пользователь с `platform_sub = sub` — используем его;
 2. иначе создаём запись `{username: preferred_username, display_name: name, platform_sub: sub, password_hash: NULL}`; для `typ: "service"` — с пометкой «сервис» (`sub` вида `svc:<uuid>` храните как строку).
 
-Чтобы история (прогоны, аудит) осталась за прежними учётными записями, при переходе на платформу заполните `platform_sub` у существующих пользователей: утилита платформы `python -m app.cli import-scanner --apply --out <каталог>` пишет `mapping.json` с соответствием `users: {<id в «Сканере»>: <uuid в платформе>}`. Достаточно `UPDATE users SET platform_sub = … WHERE id = …` по этому файлу (сделайте это командой CLI «Сканера», а не руками).
+Чтобы история (прогоны, аудит) осталась за прежними учётными записями, при переходе на платформу заполните `platform_sub` у существующих пользователей: утилита платформы `python -m app.cli import-scanner --apply --out <каталог>` пишет `mapping.json` с соответствием `users: {<id в «Сканере»>: <uuid в платформе>}`. Там же лежит готовый `scanner-link-users.sql` (`UPDATE users SET platform_sub = … WHERE id = …` по этому файлу); его выполняют в БД «Сканера» после миграции, добавившей `platform_sub`, и до включения `AUTH_MODE=platform` (контракт v1.1, п. 2.5; [`docs/MIGRATION.md`](../MIGRATION.md), шаг 4). Своя команда CLI «Сканера», читающая `mapping.json`, тоже подходит.
 
 ## 2. Проекты
 

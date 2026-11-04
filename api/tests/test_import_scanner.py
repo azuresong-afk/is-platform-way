@@ -187,6 +187,7 @@ def test_alternative_schema_and_map(client, db, tmp_path):
     project = db.scalar(select(Project).where(Project.name == "Старый"))
     assert project.status == "archived" and project.client == "Заказчик"
     assert "WHERE \"id\" = 'e-1'" in scanner.scanner_sql(report, engs)
+    assert "WHERE \"uid\" = 'u1'" in scanner.scanner_users_sql(report, users)
 
 
 def test_missing_users_table_is_reported(tmp_path):
@@ -198,7 +199,13 @@ def test_missing_users_table_is_reported(tmp_path):
 
 def test_cli_dry_run_writes_nothing(client, db, source_url, tmp_path, capsys):
     assert cli_main(["import-scanner", "--source", source_url]) == 0
-    assert "пробный запуск" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert "пробный запуск" in printed
+    # логин «admin» уже занят администратором платформы — оператор должен это увидеть до --apply
+    assert (
+        "Уже есть в платформе, получат роли «Сканера» (пароль и профиль платформы не меняются): admin"
+        in printed
+    )
     db.expire_all()
     assert db.scalar(select(User).where(User.username == "ivanov")) is None
 
@@ -209,6 +216,8 @@ def test_cli_dry_run_writes_nothing(client, db, source_url, tmp_path, capsys):
     mapping = json.loads((out / "mapping.json").read_text("utf-8"))
     assert set(mapping["engagements"]) == {"10", "11"}
     assert "platform_project_id" in (out / "scanner-link-projects.sql").read_text("utf-8")
+    users_sql = (out / "scanner-link-users.sql").read_text("utf-8")
+    assert f'UPDATE "users" SET platform_sub = \'{mapping["users"]["1"]}\' WHERE "id" = 1;' in users_sql
 
 
 def test_cli_rejects_bad_map(source_url):
