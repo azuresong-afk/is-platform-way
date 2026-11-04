@@ -53,6 +53,10 @@ def init_engine(url: str) -> Engine:
     return _engine
 
 
+def engine_ready() -> bool:
+    return _engine is not None
+
+
 def get_engine() -> Engine:
     assert _engine is not None, "init_engine() не вызван"
     return _engine
