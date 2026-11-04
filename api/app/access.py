@@ -12,7 +12,8 @@ from .models import GroupMember, GroupProductRole, GroupProject, ProjectMember, 
 
 
 def effective_roles(db: Session, user: User) -> dict[str, list[str]]:
-    enabled = set(products.enabled_ids(db))
+    # Роль, исчезнувшая из манифеста продукта, в токен не попадает.
+    allowed = {p.id: set((p.manifest or {}).get("roles") or {}) for p in products.enabled_products(db)}
     out: dict[str, set[str]] = {}
     own = db.execute(
         select(UserProductRole.product_id, UserProductRole.role).where(UserProductRole.user_id == user.id)
@@ -23,7 +24,7 @@ def effective_roles(db: Session, user: User) -> dict[str, list[str]]:
         .where(GroupMember.user_id == user.id)
     )
     for pid, role in [*own, *via_groups]:
-        if pid in enabled:
+        if role in allowed.get(pid, ()):
             out.setdefault(pid, set()).add(role)
     return {
         pid: sorted(roles) for pid, roles in sorted(out.items(), key=lambda kv: products.ORDER.get(kv[0], 99))
