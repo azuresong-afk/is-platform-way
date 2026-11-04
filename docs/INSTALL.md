@@ -190,6 +190,51 @@ deploy/restore.sh backups/20261104T023000Z --only vm   # только база �
 
 Проверка всей процедуры на заглушках продуктов — `dev/suite-restore-check.sh` (см. `docs/TESTING.md`): поднимает комплект, создаёт данные, делает копию, удаляет стенд вместе с томами, восстанавливает на новом и проверяет вход, проекты, ключи, данные продуктов и права пользователей БД. Тот же сценарий выполняется в CI.
 
+## Установка без интернета
+
+Для закрытого контура, где у сервера нет доступа к реестрам образов, npm и PyPI. Пакет собирается на машине с доступом к реестрам и переносится на сервер одним файлом.
+
+### Сборка пакета (машина с интернетом)
+
+Из корня репозитория, с `.env` комплекта, в котором заданы `PLATFORM_PRODUCTS` и образы продуктов (`<ID>_IMAGE`, `<ID>_WEB_IMAGE`). Секреты в этом `.env` не нужны и в пакет не попадают.
+
+```bash
+deploy/suite.sh build                          # образы платформы (или задайте PLATFORM_*_IMAGE)
+deploy/bundle.sh create --version 1.0.0        # → bundles/platform-bundle-1.0.0.tar и .tar.sha256
+```
+
+Скрипт берёт образы так же, как `deploy/suite.sh`: платформа (`PLATFORM_API_IMAGE`, `PLATFORM_WEB_IMAGE`, `PLATFORM_GATEWAY_IMAGE`, по умолчанию `platform-*:local`), PostgreSQL (`POSTGRES_IMAGE`, по умолчанию `postgres:16-alpine`) и для каждого id из `PLATFORM_PRODUCTS` — `<ID>_IMAGE` и `<ID>_WEB_IMAGE`, если задан. Список продуктов в скрипте не зашит: новый продукт попадает в пакет, как только он есть в `.env`. Недостающие образы продуктов и PostgreSQL скачиваются (`docker pull`), образы платформы нужно собрать заранее. Другой файл окружения — `SUITE_ENV_FILE=…`, другой каталог — `--out`, без `@platform/ui` — `--no-ui`.
+
+Что внутри `platform-bundle-<версия>/`:
+
+| Файл | Что это |
+|---|---|
+| `images/images.tar.gz`, `images/IMAGES` | `docker save` всех образов; список «образ — его ID» для проверки после загрузки |
+| `bundle.env` | строки `PLATFORM_*_IMAGE`, `POSTGRES_IMAGE`, `<ID>_IMAGE`, `<ID>_WEB_IMAGE` для `.env` на сервере |
+| `docker-compose.suite.yml`, `docker-compose.yml`, `deploy/*`, `.env.suite.example`, `.env.example`, `docs/INSTALL.md` | файлы комплекта, как в репозитории |
+| `ui/platform-ui-<версия>.tgz` | `@platform/ui` для сборки продуктов в контуре: `npm install ./platform-ui-<версия>.tgz` |
+| `VERSION` | версия, коммит, время сборки, продукты |
+| `SHA256SUMS` | суммы SHA-256 всех файлов пакета |
+
+### Установка на сервер
+
+```bash
+sha256sum -c platform-bundle-1.0.0.tar.sha256  # файл .sha256 передайте отдельным каналом
+tar -xf platform-bundle-1.0.0.tar && cd platform-bundle-1.0.0
+deploy/bundle.sh load                          # проверка SHA256SUMS → docker load → проверка ID образов
+cp .env.suite.example .env
+```
+
+`load` останавливается, если хоть одна сумма не сходится, и после загрузки сверяет ID каждого образа с `images/IMAGES`. Только проверить пакет, ничего не загружая, — `deploy/bundle.sh verify`.
+
+В `.env` замените строки образов строками из `bundle.env` и заполните секреты, как в разделе «Комплект → Установка». Запуск — с запретом скачивания, чтобы ошибка в имени образа сразу была видна, а не превращалась в попытку сходить в реестр:
+
+```bash
+deploy/suite.sh up -d --wait --pull never
+```
+
+Каталог пакета дальше служит рабочим каталогом установки: `deploy/backup.sh`, `deploy/restore.sh` и `deploy/suite.sh` работают из него так же, как из репозитория. Обновление — новый пакет: загрузите его образы (`deploy/bundle.sh load` в каталоге нового пакета), перенесите `.env`, `deploy/env/*.env` и `deploy/tls/` в новый каталог, сделайте копию `deploy/backup.sh --offline` в старом и запустите `deploy/suite.sh up -d --wait --pull never` в новом.
+
 ## TLS
 
 Шлюз включает https на порту 8443 (снаружи — `PLATFORM_GATEWAY_TLS_PORT`, по умолчанию 18443), когда заданы `TLS_CERT` и `TLS_KEY`. Тогда http-порт отвечает редиректом на https (кроме `/healthz`).
