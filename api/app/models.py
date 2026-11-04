@@ -220,3 +220,55 @@ class ServiceAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     secret_rotated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Event(Base):
+    """Принятое событие шины (контракт v1.1, п. 6). id из конверта — ключ идемпотентности."""
+
+    __tablename__ = "events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    type: Mapped[str] = mapped_column(String(100), index=True)
+    source: Mapped[str] = mapped_column(String(20), index=True)
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+    subject: Mapped[str] = mapped_column(String(300), default="")
+    data: Mapped[dict] = mapped_column(JsonType, default=dict)
+    notify: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class Subscription(Base):
+    """Подписка продукта на события: из манифеста (events.webhook, events.subscribe)."""
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    product_id: Mapped[str] = mapped_column(String(20), unique=True)
+    # путь внутри API продукта (без /api/<id>)
+    webhook_path: Mapped[str] = mapped_column(String(300), default="")
+    types: Mapped[list] = mapped_column(JsonType, default=list)
+    # выключает администратор; опрос манифеста флаг не трогает
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Delivery(Base):
+    """Доставка события подписчику: повторы через 1, 5, 15, 60 мин, затем dead."""
+
+    __tablename__ = "deliveries"
+    __table_args__ = (UniqueConstraint("event_id", "subscription_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    subscription_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("subscriptions.id", ondelete="CASCADE"))
+    # pending | ok | failed (ждёт повтора) | dead (не доставлено)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

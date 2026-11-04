@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from . import products, users
+from . import events, products, users
 from .config import get_settings
 from .db import init_engine, session_scope
 from .routers import health
@@ -28,13 +28,17 @@ def create_app() -> FastAPI:
             products.sync_from_settings(db)
             keys.ensure_active_key(db)
             users.ensure_bootstrap_admin(db)
-        poller = None
+        poller = dispatcher = None
         if settings.background_tasks:
             poller = products.ManifestPoller(settings.manifest_poll_seconds)
             poller.start()
+            dispatcher = events.Dispatcher()
+            dispatcher.start()
         yield
         if poller:
             poller.stop_event.set()
+        if dispatcher:
+            dispatcher.stop()
 
     # API работает за шлюзом с отрезанием префикса /api/platform (контракт v1, п. 1);
     # префикс для документации задаётся при запуске: uvicorn --root-path /api/platform.

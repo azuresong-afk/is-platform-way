@@ -69,3 +69,20 @@
 | 7.1 | `docker compose exec db psql -U platform -c "select action, actor_name from audit_log order by id desc limit 10"` | Вход, создание пользователя, выдача ролей, архивирование — записаны |
 | 7.2 | `... -c "update audit_log set action='x'"` | Ошибка триггера «audit_log: изменение и удаление записей запрещены» |
 | 7.3 | `docker compose logs platform-api \| grep -i -E "password\|secret\|eyJ"` | Паролей, секретов и токенов нет |
+
+## 8. Шина событий (этап 2.3)
+
+Отправка тестового события: `python dev/send_event.py --product scanner --secret "$SCANNER_EVENTS_SECRET" --type scanner.run.finished` (адрес по умолчанию — шлюз `:18090`).
+
+| # | Действие | Ожидаемый результат |
+|---|---|---|
+| 8.1 | Отправить событие | `202 {"accepted":true}`; в «Администрирование → События» строка «Сканер · scanner.run.finished» |
+| 8.2 | Повторить с тем же `--id <id>` | `200 {"duplicate":true}`, второй строки нет |
+| 8.3 | Отправить с `--secret wrong` | `401 bad_signature`; в `audit_log` запись `event.receive` с результатом `denied` |
+| 8.4 | «Подписки продуктов» | «Устранение» и «Аттестация» подписаны на `scanner.run.finished`, «Сканер» — на `vm.remediation.verified` |
+| 8.5 | После 8.1 открыть событие | Доставка «Устранению» и «Аттестации» — «Доставлено» |
+| 8.6 | `docker compose stop fake-grc`, отправить событие | Доставка «Аттестации» — «Повтор», текст ошибки, время следующей попытки ≈ через 1 мин; фильтр «С ошибками доставки» показывает событие |
+| 8.7 | `docker compose restart platform-api` | Очередь не потерялась: доставка «Аттестации» по-прежнему в повторе |
+| 8.8 | `docker compose start fake-grc`, в карточке события «Отправить ещё раз» | Через несколько секунд — «Доставлено»; в журнале аудита `event.redeliver` |
+| 8.9 | Отключить подписку «Аттестации», отправить событие | «Аттестации» доставка не создаётся |
+| 8.10 | Отправить в архив любой проект | Событие «Платформа · platform.project.updated» |
