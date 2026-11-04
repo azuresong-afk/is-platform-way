@@ -6,6 +6,7 @@ import { EventsPage } from "./pages/admin/Events";
 import { ProductsPage } from "./pages/admin/Products";
 import { ProjectsPage } from "./pages/admin/Projects";
 import { ServiceAccountsPage } from "./pages/admin/ServiceAccounts";
+import { SigningKeysPage } from "./pages/admin/SigningKeys";
 import { UsersPage } from "./pages/admin/Users";
 import { HomePage } from "./pages/Home";
 import { LoginPage } from "./pages/Login";
@@ -24,6 +25,7 @@ function Authed() {
         <Route path="/admin/products" element={<AdminOnly><ProductsPage /></AdminOnly>} />
         <Route path="/admin/events" element={<AdminOnly><EventsPage /></AdminOnly>} />
         <Route path="/admin/service-accounts" element={<AdminOnly><ServiceAccountsPage /></AdminOnly>} />
+        <Route path="/admin/keys" element={<AdminOnly><SigningKeysPage /></AdminOnly>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </ShellLayout>

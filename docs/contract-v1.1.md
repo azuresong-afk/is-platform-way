@@ -135,7 +135,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело запроса как есть, с
 
 Дополнительные поля в `data` допустимы и сохраняются.
 
-Платформа сама публикует: `platform.project.updated {project_id, name, status}`, `platform.user.blocked {sub}`, `platform.keys.rotated {kid}`.
+Платформа сама публикует: `platform.project.updated {project_id, name, status}`, `platform.user.blocked {sub}`, `platform.keys.rotated {kid, revoked}`. В `platform.keys.rotated` поле `kid` — ключ, который начал подписывать; `revoked` — список `kid`, отозванных при срочной смене и уже убранных из JWKS (обычно пусто). Получив непустой `revoked`, продукт сразу сбрасывает кэш JWKS и перестаёт принимать токены с этими `kid`.
 
 ### 6.3. Поле `notify`
 

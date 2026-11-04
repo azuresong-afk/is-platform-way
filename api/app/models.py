@@ -172,7 +172,7 @@ class SigningKey(Base):
     kid: Mapped[str] = mapped_column(String(64), primary_key=True)
     private_key_enc: Mapped[str] = mapped_column(Text)
     public_jwk: Mapped[dict] = mapped_column(JsonType)
-    # next | active | retired
+    # next | active | retired | revoked (выведен при компрометации, в JWKS не публикуется)
     status: Mapped[str] = mapped_column(String(20), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

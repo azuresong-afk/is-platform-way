@@ -35,7 +35,15 @@ class Settings(BaseSettings):
     # Окно, в которое повторное предъявление refresh-токена считается гонкой
     # двух вкладок, а не кражей.
     refresh_reuse_grace_seconds: int = 10
+    # Сколько прежний ключ остаётся в JWKS после смены: не меньше TTL access-токена,
+    # иначе уже выданные токены перестанут проверяться раньше срока.
     jwks_retain_seconds: int = 1800
+    # Плановая ротация ключа подписи: раз в key_rotation_days дней. Новый ключ
+    # сначала публикуется в JWKS со статусом next и начинает подписывать не раньше
+    # чем через key_next_lead_seconds — дольше кэша JWKS в продуктах (600 с).
+    key_rotation_days: int = 90
+    key_next_lead_seconds: int = 1200
+    key_rotation_check_seconds: int = 60
 
     login_max_failures: int = 5
     login_lock_minutes: int = 15
