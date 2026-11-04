@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import aware, session_scope, utcnow
 from .models import Delivery, Event, Product, Subscription
+from .security.links import is_safe_path
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class Notify(BaseModel):
     @classmethod
     def _relative(cls, v: str | None) -> str | None:
         # только относительный путь того же origin (контракт v1.1, п. 6.3)
-        if v is not None and (not v.startswith("/") or v.startswith("//") or "\\" in v):
+        if v is not None and not is_safe_path(v):
             raise ValueError("link должен быть относительным путём")
         return v
 

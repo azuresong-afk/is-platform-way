@@ -87,7 +87,10 @@ jobs:
             -e SCANNER_LARGE_UPLOAD_PATHS=/feeds/bdu/upload -e DEMO_API_UPSTREAM=http://d:8000 \
             --entrypoint sh platform-gateway -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t \
               && grep -q 'location /api/demo/' /etc/nginx/conf.d/default.conf \
-              && grep -q 'location = /api/scanner/feeds/bdu/upload' /etc/nginx/conf.d/default.conf"
+              && grep -q 'location = /api/scanner/feeds/bdu/upload' /etc/nginx/conf.d/default.conf \
+              && grep -A1 'location = /api/platform/auth/login' /etc/nginx/conf.d/default.conf | grep -q limit_req"
+          # Неверный лимит входа — шлюз не стартует, а не работает без лимита.
+          ! docker run --rm -e LOGIN_RATE_BURST=0 --entrypoint sh platform-gateway -c /docker-entrypoint.d/05-render-gateway.sh
           mkdir -p tls && openssl req -x509 -newkey rsa:2048 -nodes -keyout tls/privkey.pem -out tls/fullchain.pem \
             -days 1 -subj /CN=localhost && chmod 644 tls/*.pem
           docker run --rm -v "$PWD/tls:/etc/nginx/tls:ro" -e TLS_CERT=/etc/nginx/tls/fullchain.pem \

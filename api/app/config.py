@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     # в кабинете не появляется.
     platform_products: str = DEFAULT_PLATFORM_PRODUCTS
 
+    # Swagger UI и схема OpenAPI (/api/platform/docs, /openapi.json). По умолчанию выключены:
+    # наружу схема не нужна, а Swagger UI грузит скрипты с CDN и всё равно не проходит CSP шлюза.
+    api_docs: bool = False
+
     manifest_poll_seconds: int = 60
     background_tasks: bool = Field(default=True)
 

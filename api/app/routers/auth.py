@@ -101,6 +101,7 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     audit.record(db, action="auth.login", actor_sub=str(user.id), actor_name=user.display_name, ip=ip)
     db.commit()
     _set_cookie(response, issued.cookie_value)
+    response.headers["Cache-Control"] = "no-store"
     return out
 
 
@@ -124,13 +125,15 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
                 details={"family_id": str(rec.family_id)},
             )
         db.commit()
-        failed = JSONResponse({"detail": err.value if err else "invalid"}, status_code=401)
+        detail = err.value if err else "invalid"
+        failed = JSONResponse({"detail": detail}, status_code=401, headers={"Cache-Control": "no-store"})
         _clear_cookie(failed)
         return failed
     user = db.get(User, issued.record.user_id)
     out = _token_out(db, user)
     db.commit()
     _set_cookie(response, issued.cookie_value)
+    response.headers["Cache-Control"] = "no-store"
     return out
 
 

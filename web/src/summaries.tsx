@@ -9,6 +9,7 @@ import {
   formatDateTime,
   formatNumber,
   formatPercent,
+  isSafePath,
   SEVERITIES,
   SEVERITY_LABELS,
   SeverityBadge,
@@ -23,7 +24,7 @@ type SummaryData = Record<string, unknown>;
 
 /** Ссылка только на свой origin: продукт не должен уводить пользователя наружу. */
 export function safeLink(link: unknown, fallback: string): string {
-  return typeof link === "string" && link.startsWith("/") && !link.startsWith("//") ? link : fallback;
+  return isSafePath(link) ? link : fallback;
 }
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);

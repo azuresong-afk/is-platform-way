@@ -2,7 +2,7 @@ import { Bell, CheckCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "../hooks/useAuth";
-import { PLATFORM_API } from "../lib/api";
+import { isSafePath, PLATFORM_API } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 
 /** Уведомление пользователя (GET /api/platform/notifications). */
@@ -29,8 +29,7 @@ export function notificationsChanged(): void {
 
 /** Только относительный путь того же origin — как проверяет платформа при приёме. */
 export function safeLink(link: string | null | undefined): string | null {
-  if (!link || !link.startsWith("/") || link.startsWith("//") || link.includes("\\")) return null;
-  return link;
+  return isSafePath(link) ? link : null;
 }
 
 export interface NotificationBellProps {

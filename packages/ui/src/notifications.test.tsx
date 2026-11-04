@@ -103,5 +103,6 @@ describe("NotificationBell", () => {
     expect(safeLink("https://evil.example")).toBeNull();
     expect(safeLink("/\\evil")).toBeNull();
     expect(safeLink(null)).toBeNull();
+    expect(safeLink("/\t/evil.example")).toBeNull();
   });
 });

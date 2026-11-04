@@ -24,6 +24,17 @@ describe("api", () => {
     expect(safeNext("/login?next=/x")).toBe("/");
   });
 
+  it("safeNext не пропускает табуляцию и переводы строк, которые браузер выбрасывает из URL", () => {
+    // /login?next=/%09/evil.example: URLSearchParams раскодирует %09, браузер получит //evil.example
+    const next = new URLSearchParams("next=/%09/evil.example").get("next");
+    expect(new URL(next!, "https://platform.test").host).toBe("evil.example");
+    expect(safeNext(next)).toBe("/");
+    expect(safeNext("/\n/evil.example")).toBe("/");
+    expect(safeNext("/\r/evil.example")).toBe("/");
+    expect(safeNext("/ /evil.example")).toBe("/");
+    expect(safeNext("/scanner/%09x")).toBe("/scanner/%09x");
+  });
+
   it("при 401 один общий refresh на параллельные запросы, затем повтор", async () => {
     setToken("old");
     let refreshes = 0;

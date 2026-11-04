@@ -78,10 +78,19 @@ export function refreshOnce(apiBase: string = PLATFORM_API): Promise<string | nu
   return refreshing;
 }
 
-/** Безопасный путь возврата после входа: только относительный путь того же origin. */
+/**
+ * Путь от корня этого origin. Браузер выбрасывает из URL табуляцию и переводы строк, а «\\» считает «/»,
+ * поэтому «/\\t/evil.example» ведёт на чужой сайт: такие символы не допускаются вовсе
+ * (docs/SECURITY.md, п. 9; та же проверка в API — app/security/links.py).
+ */
+export function isSafePath(path: unknown): path is string {
+  // eslint-disable-next-line no-control-regex
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") && !/[\u0000-\u0020\u007f\\]/.test(path);
+}
+
+/** Безопасный путь возврата после входа: только путь того же origin. */
 export function safeNext(next: string | null | undefined, fallback = "/"): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  if (next.startsWith("/login")) return fallback;
+  if (!isSafePath(next) || next.startsWith("/login")) return fallback;
   return next;
 }
 

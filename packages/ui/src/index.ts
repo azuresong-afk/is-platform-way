@@ -16,6 +16,7 @@ export {
   PLATFORM_API,
   redirectToLogin,
   refreshOnce,
+  isSafePath,
   safeNext,
   setToken,
   type TokenClaims,
