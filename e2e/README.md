@@ -16,6 +16,7 @@ Playwright в настоящем браузере против стенда из
 cd e2e
 npm ci
 npx playwright install chromium   # один раз
+cp stack.env ../.env              # шлюз и API читают продукты из .env (сохраните свой .env, если он есть)
 npm run stack:up                  # docker compose -p platform-e2e … --profile fakes up --build --wait
 npm run e2e
 npm run stack:down                # остановить и удалить данные стенда

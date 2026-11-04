@@ -112,6 +112,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx playwright install --with-deps chromium
+      # Шлюз и API читают продукты из .env целиком (env_file, roadmap §1а) — стенду нужен .env.
+      - name: .env стенда из stack.env
+        run: cp stack.env ../.env
       - name: Стенд (docker compose, профиль fakes)
         run: npm run stack:up
       - run: npm run e2e
