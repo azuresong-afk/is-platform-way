@@ -14,8 +14,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from html import escape
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse
 
 from .auth import Caller, JwksCache, require_project, verify_request
 
@@ -27,6 +30,9 @@ class ProductSpec:
     summary: Callable[[str], dict]
     # (project_id) -> список объектов для поиска {kind,title,subtitle,link,severity?}
     objects: Callable[[str], list[dict]]
+
+
+STATIC = Path(__file__).with_name("static")
 
 
 def seed(project_id: str, salt: str) -> int:
@@ -55,6 +61,26 @@ def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
             time.sleep(delay)
         if os.environ.get("FAKE_FAIL") == "1":
             raise HTTPException(500, detail="fake failure")
+
+    # Крошечная страница продукта для e2e (шлюз: <ID>_WEB_UPSTREAM = адрес этой же заглушки).
+    page = (
+        (STATIC / "index.html")
+        .read_text(encoding="utf-8")
+        .replace("__PRODUCT__", escape(pid))
+        .replace("__TITLE__", escape(spec.manifest["title"]))
+    )
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def index() -> HTMLResponse:
+        return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
+
+    @app.get("/app.js", include_in_schema=False)
+    def app_js() -> FileResponse:
+        return FileResponse(STATIC / "app.js", media_type="text/javascript")
+
+    @app.get("/app.css", include_in_schema=False)
+    def app_css() -> FileResponse:
+        return FileResponse(STATIC / "app.css", media_type="text/css")
 
     @app.get("/manifest")
     def manifest() -> dict:

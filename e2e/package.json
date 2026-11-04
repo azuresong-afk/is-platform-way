@@ -1,0 +1,18 @@
+{
+  "name": "platform-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Сквозные тесты единого входа на заглушках продуктов (Playwright)",
+  "scripts": {
+    "stack:up": "docker compose -p platform-e2e -f ../docker-compose.yml --env-file stack.env --profile fakes up -d --build --wait",
+    "stack:down": "docker compose -p platform-e2e -f ../docker-compose.yml --env-file stack.env --profile fakes down -v",
+    "stack:logs": "docker compose -p platform-e2e -f ../docker-compose.yml --env-file stack.env --profile fakes logs --no-color",
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.10.0"
+  }
+}

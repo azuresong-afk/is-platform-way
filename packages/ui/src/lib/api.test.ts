@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiFetch, decodeClaims, getToken, safeNext, setToken } from "./api";
+import { apiFetch, decodeClaims, getToken, logout, onLogoutElsewhere, safeNext, setToken } from "./api";
+import { LOGOUT_KEY } from "./storage";
 
 function jwt(claims: object): string {
   const b64 = (o: object) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replace(/=+$/, "");
@@ -60,5 +61,26 @@ describe("api", () => {
     const r = await apiFetch("/api/grc/x");
     expect(r.status).toBe(403);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("выход оставляет сигнал для других вкладок", async () => {
+    setToken("t");
+    vi.stubGlobal("location", { ...window.location, assign: vi.fn() });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    await logout();
+    expect(getToken()).toBeNull();
+    expect(Number(window.localStorage.getItem(LOGOUT_KEY))).toBeGreaterThan(0);
+  });
+
+  it("выход в другой вкладке очищает токен этой вкладки", () => {
+    setToken("t");
+    const handler = vi.fn();
+    const off = onLogoutElsewhere(handler);
+    window.dispatchEvent(new StorageEvent("storage", { key: "platform.theme", newValue: "dark" }));
+    expect(handler).not.toHaveBeenCalled();
+    window.dispatchEvent(new StorageEvent("storage", { key: LOGOUT_KEY, newValue: String(Date.now()) }));
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(getToken()).toBeNull();
+    off();
   });
 });
