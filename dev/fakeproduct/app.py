@@ -155,6 +155,9 @@ def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
             if any(e["id"] == event.get("id") for e in request.app.state.events):
                 return {"duplicate": True}
             request.app.state.events.append(event)
+            if event.get("type") == "platform.keys.rotated":
+                data = event.get("data") or {}
+                request.app.state.jwks.rotated(str(data.get("kid", "")), list(data.get("revoked") or []))
             return {"accepted": True}
 
         @app.get("/events/received")

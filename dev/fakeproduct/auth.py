@@ -27,6 +27,7 @@ class JwksCache:
         self._fetch = fetch or self._http_fetch
         self._keys: dict[str, dict] = {}
         self._fetched_at = 0.0
+        self._revoked: set[str] = set()
         self._lock = threading.Lock()
 
     def _http_fetch(self) -> dict:
@@ -47,7 +48,17 @@ class JwksCache:
                     self._refresh()
                 except (httpx.HTTPError, ValueError):
                     pass
-            return self._keys.get(kid)
+            return None if kid in self._revoked else self._keys.get(kid)
+
+    def rotated(self, kid: str, revoked: list[str]) -> None:
+        """Событие platform.keys.rotated (контракт v1.1, п. 6.2): отозванные kid больше не принимать,
+        а если новый ключ ещё не в кэше — перечитать JWKS сейчас, без ограничения «не чаще раза в 30 с»."""
+        with self._lock:
+            self._revoked.update(revoked)
+            for r in revoked:
+                self._keys.pop(r, None)
+            if revoked or kid not in self._keys:
+                self._fetched_at = 0.0
 
 
 @dataclass
