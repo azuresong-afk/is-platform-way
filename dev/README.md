@@ -19,6 +19,6 @@ PLATFORM_JWKS_URL=http://127.0.0.1:18010/.well-known/jwks.json \
   PYTHONPATH=. uvicorn main:app --app-dir fake-scanner --port 18000
 ```
 
-Переменные: `PLATFORM_JWKS_URL`, `PLATFORM_EVENTS_SECRET`, `FAKE_DELAY_SECONDS` (задержка `/summary` и `/search`), `FAKE_FAIL=1` (ответ 500 — проверка карточки «недоступен»).
+Переменные: `DATABASE_URL` (в комплекте: заглушка пишет строку в таблицу `fake_boot` своей базы при старте, `/health/ready` проверяет соединение — для `dev/suite-restore-check.sh`), `PLATFORM_JWKS_URL`, `PLATFORM_EVENTS_SECRET`, `FAKE_DELAY_SECONDS` (задержка `/summary` и `/search`), `FAKE_FAIL=1` (ответ 500 — проверка карточки «недоступен»).
 
 Тесты: `cd dev && pytest`.
