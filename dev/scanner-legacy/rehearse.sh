@@ -17,7 +17,10 @@ ENV="$WORK/stand.env"
 G="http://127.0.0.1:28090"
 SRC='postgresql+psycopg://scanner_ro:scanner-ro-pass@scanner-legacy-db:5432/scanner'
 export COMPOSE_PROFILES=fakes,migration
-dc() { docker compose -p platform-migration -f "$ROOT/docker-compose.yml" --env-file "$ENV" "$@"; }
+OVERRIDE="$WORK/override.yml"
+# Шлюз и API читают продукты из env_file (.env в корне); стенду нужен свой файл, а .env владельца не трогаем.
+dc() { docker compose -p platform-migration -f "$ROOT/docker-compose.yml" -f "$OVERRIDE" --env-file "$ENV" "$@"; }
+SERVICES=(db platform-api platform-web gateway fake-scanner fake-vm fake-grc scanner-legacy-db)
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 ok() { printf '  ok: %s\n' "$*"; }
@@ -48,6 +51,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+cat >"$OVERRIDE" <<EOF
+services:
+  gateway:
+    env_file: !override $ENV
+  platform-api:
+    env_file: !override $ENV
+EOF
 cat >"$ENV" <<EOF
 PLATFORM_SECRET_KEY=$(python3 -c 'import os,base64;print(base64.b64encode(os.urandom(32)).decode())')
 PLATFORM_DB_PASSWORD=rehearsal-db-pass
@@ -58,6 +68,7 @@ PLATFORM_GATEWAY_PORT=28090
 PLATFORM_GATEWAY_TLS_PORT=28443
 PLATFORM_API_PORT=28010
 PLATFORM_DB_PORT=25440
+PLATFORM_PRODUCTS=scanner,vm,grc
 SCANNER_API_UPSTREAM=
 VM_API_UPSTREAM=http://fake-vm:8000
 GRC_API_UPSTREAM=http://fake-grc:8000
@@ -67,8 +78,8 @@ GRC_EVENTS_SECRET=$(openssl rand -hex 16)
 EOF
 
 step "0. Исходное состояние: «Сканер» работает отдельно, платформа установлена без него"
-[[ "${SKIP_BUILD:-}" == 1 ]] || dc build
-dc up -d --wait >/dev/null 2>&1
+[[ "${SKIP_BUILD:-}" == 1 ]] || dc build "${SERVICES[@]}"
+dc up -d --wait "${SERVICES[@]}" >/dev/null 2>&1
 expect "«Сканера» нет в шлюзе" 404 "$(code "$G/api/scanner/manifest")"
 expect "пользователей «Сканера» в платформе нет" 401 "$(login_code ivanov ivanov-pass-1)"
 
@@ -102,11 +113,14 @@ else
   fail "$again"
 fi
 
-step "4. Привязка проектов в БД «Сканера»"
-# На настоящем «Сканере» столбец добавляет его миграция; здесь — вручную.
+step "4. Привязка проектов и пользователей в БД «Сканера»"
+# На настоящем «Сканере» столбцы добавляет его миграция; здесь — вручную.
 psql_scanner 'ALTER TABLE engagements ADD COLUMN platform_project_id uuid UNIQUE' >/dev/null
-dc exec -T scanner-legacy-db psql -U scanner -d scanner -v ON_ERROR_STOP=1 -q \
-  <"$WORK/scanner-import/scanner-link-projects.sql" >/dev/null
+psql_scanner 'ALTER TABLE users ADD COLUMN platform_sub text UNIQUE' >/dev/null
+for f in scanner-link-projects.sql scanner-link-users.sql; do
+  dc exec -T scanner-legacy-db psql -U scanner -d scanner -v ON_ERROR_STOP=1 -q <"$WORK/scanner-import/$f" >/dev/null
+done
+expect "все пользователи привязаны" 0 "$(psql_scanner 'select count(*) from users where platform_sub is null')"
 expect "все engagement привязаны" 0 "$(psql_scanner 'select count(*) from engagements where platform_project_id is null')"
 expect "id совпадают с mapping.json" \
   "$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['engagements']['10'])" "$WORK/scanner-import/mapping.json")" \
@@ -122,6 +136,9 @@ IV="$(token ivanov ivanov-pass-1)"
 ok "ivanov входит в платформу со старым паролем «Сканера»"
 expect "Sidorova (логин в другом регистре) входит" 200 "$(login_code Sidorova sidorova-pass-1)"
 claims="$(python3 -c "import sys,json,base64;p=sys.argv[1].split('.')[1];p+='='*(-len(p)%4);c=json.loads(base64.urlsafe_b64decode(p));print(sorted(c['products'].get('scanner',[])),c['projects'])" "$IV")"
+expect "sub в токене = platform_sub пользователя в «Сканере» (история останется за ним)" \
+  "$(psql_scanner 'select platform_sub from users where id=1')" \
+  "$(python3 -c "import sys,json,base64;p=sys.argv[1].split('.')[1];p+='='*(-len(p)%4);print(json.loads(base64.urlsafe_b64decode(p))['sub'])" "$IV")"
 expect "роли и проекты в токене" "['cred_audit', 'host_credentials', 'operator'] ['*']" "$claims"
 expect "вкладка «Сканер» доступна" True \
   "$(curl -s "$G/api/platform/products" -H "Authorization: Bearer $IV" |

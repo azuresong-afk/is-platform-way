@@ -76,8 +76,10 @@ def import_scanner(args: argparse.Namespace) -> int:
         out.mkdir(parents=True, exist_ok=True)
         (out / "mapping.json").write_text(json.dumps(report.mapping, ensure_ascii=False, indent=2), "utf-8")
         (out / "scanner-link-projects.sql").write_text(scanner.scanner_sql(report, engagements), "utf-8")
+        (out / "scanner-link-users.sql").write_text(scanner.scanner_users_sql(report, users), "utf-8")
         print(
-            f"\nСоответствия: {out / 'mapping.json'}; SQL для «Сканера»: {out / 'scanner-link-projects.sql'}"
+            f"\nСоответствия: {out / 'mapping.json'}; SQL для «Сканера»: "
+            f"{out / 'scanner-link-projects.sql'}, {out / 'scanner-link-users.sql'}"
         )
     return 0
 
