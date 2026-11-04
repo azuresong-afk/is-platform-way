@@ -146,6 +146,9 @@ def refresh_product(db: Session, prod: Product, client: httpx.Client | None = No
                 prod.version = str(data.get("version") or "")
                 prod.manifest_fetched_at = now
                 prod.last_error = None
+                from . import events  # noqa: PLC0415 - избегаем цикла импортов
+
+                events.sync_subscription(db, prod)
             else:
                 prod.last_error = "манифест не соответствует контракту"
         except (httpx.HTTPError, ValueError) as exc:

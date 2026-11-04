@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from .. import access, audit
+from .. import access, audit, events
 from ..db import aware, get_db, utcnow
 from ..deps import Principal, client_ip, current_principal, require_admin
 from ..models import Project, ProjectMember, User
@@ -149,6 +149,16 @@ def admin_projects(
     return [project_out(x) for x in page.apply(db, stmt, response)]
 
 
+def _publish(db: Session, proj: Project) -> None:
+    events.publish(
+        db,
+        "platform.project.updated",
+        {"project_id": str(proj.id), "name": proj.name, "status": proj.status},
+        project_id=proj.id,
+        subject=f"project/{proj.id}",
+    )
+
+
 @router.post("/admin/projects", response_model=ProjectOut, status_code=201)
 def create_project(
     body: ProjectIn, request: Request, p: Principal = Depends(require_admin), db: Session = Depends(get_db)
@@ -166,6 +176,7 @@ def create_project(
         ip=client_ip(request),
         details={"name": proj.name},
     )
+    _publish(db, proj)
     db.commit()
     return project_out(proj)
 
@@ -194,6 +205,7 @@ def patch_project(
         ip=client_ip(request),
         details={k: str(v) for k, v in changes.items()},
     )
+    _publish(db, proj)
     db.commit()
     return project_out(proj)
 
@@ -217,6 +229,7 @@ def archive_project(
         project_id=proj.id,
         ip=client_ip(request),
     )
+    _publish(db, proj)
     db.commit()
     return project_out(proj)
 
@@ -240,6 +253,7 @@ def restore_project(
         project_id=proj.id,
         ip=client_ip(request),
     )
+    _publish(db, proj)
     db.commit()
     return project_out(proj)
 
