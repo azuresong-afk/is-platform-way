@@ -1,3 +1,5 @@
 """Роутеры API. Порядок подключения — в ROUTERS."""
 
-ROUTERS: list = []
+from . import auth
+
+ROUTERS: list = [auth]
