@@ -105,7 +105,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 | `deliveries` | id, event_id, subscription_id, status (`pending/ok/failed/dead`), attempts, next_attempt_at, last_error, last_status_code, delivered_at | повторы 1/5/15/60 мин, затем `dead` |
 | `assets` | id, project_id, address, hostname, os_family, os, owner, criticality, tags[], groups[], sources (jsonb: `[{product, external_id, seen_at}]`), manual_fields[], updated_at | уникальность `(project_id, address)`; ручные правки не перетираются событиями |
 | `audit_log` | id (bigserial), time, product, actor_sub, actor_name, action, object, project_id, result, ip, details (jsonb), event_id | append-only, триггер запрещает UPDATE/DELETE |
-| `notifications` | id, user_id, event_id, title, link, product, created_at, read_at | из поля `notify` событий |
+| `notifications` | id, user_id, event_id, product, event_type, project_id, title, link, created_at, read_at | из поля `notify` событий; уникальность `(user_id, event_id)` |
 
 ## 3. API платформы (через шлюз — `/api/platform/…`)
 
@@ -131,7 +131,7 @@ deploy/         suite.sh, db/provision.sh, backup.sh, restore.sh (docker-compose
 | `POST /events` | приём событий от продуктов (HMAC) |
 | `GET /admin/events`, `POST /admin/events/{id}/redeliver`, `GET /admin/subscriptions` | события и доставка |
 | `GET /audit?product=&actor=&project=&action=&from=&to=&limit=&offset=`, `GET /audit/export?format=csv|json` | сводный журнал |
-| `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | центр уведомлений |
+| `GET /notifications` (`unread`, `product`, `project`, пагинация; `X-Unread-Count`), `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/{id}/unread`, `POST /notifications/read-all` | центр уведомлений, только свои |
 | `GET /summary?project=` | сводка по продуктам для Главной (агрегатор с таймаутом) |
 | `GET /search?q=&project=` | — **[выбор]** не делаем: Ctrl+K опрашивает `search_url` продуктов прямо из браузера параллельно, как в контракте |
 | `GET /health/live`, `GET /health/ready` | проверки |

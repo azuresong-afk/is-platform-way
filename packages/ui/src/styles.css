@@ -1610,6 +1610,142 @@ kbd {
   background: var(--border);
 }
 
+/* ---------- Уведомления ---------- */
+
+.notif-bell {
+  position: relative;
+}
+
+.notif-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.notif-popover {
+  width: min(380px, calc(100vw - 24px));
+  padding: 6px;
+}
+
+.notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1);
+  min-height: 32px;
+  padding: 0 4px 0 10px;
+}
+
+.notif-head-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+}
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: var(--s1) 10px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notif-item:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+.notif-item.unread {
+  color: var(--text);
+}
+
+.notif-mark {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.notif-mark.unread {
+  background: var(--accent);
+}
+
+.notif-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notif-title {
+  overflow-wrap: anywhere;
+}
+
+.notif-item.unread .notif-title {
+  font-weight: 600;
+}
+
+.notif-meta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.notif-all {
+  justify-content: center;
+  color: var(--accent-text);
+}
+
+/* Строка уведомления на странице списка */
+.notif-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notif-page-list > li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-page-list > li:last-child {
+  border-bottom: 0;
+}
+
+.notif-page-list .notif-item {
+  flex: 1;
+  padding: 12px 10px;
+}
+
 /* ---------- Страница входа ---------- */
 
 .auth-page {

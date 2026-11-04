@@ -203,9 +203,18 @@ def _errors(exc: ValidationError) -> list[str]:
 
 
 def publish(
-    db: Session, event_type: str, data: dict, *, project_id: uuid.UUID | None = None, subject: str = ""
+    db: Session,
+    event_type: str,
+    data: dict,
+    *,
+    project_id: uuid.UUID | None = None,
+    subject: str = "",
+    notify: dict | None = None,
 ) -> None:
-    """Собственное событие платформы (platform.*). Коммит — на стороне вызывающего."""
+    """Собственное событие платформы (platform.*). Коммит — на стороне вызывающего.
+
+    notify — как в конверте продукта: {"users": [sub, …], "title": "…", "link": "/…"}.
+    """
     store(
         db,
         Envelope(
@@ -216,6 +225,7 @@ def publish(
             project_id=project_id,
             subject=subject,
             data=data,
+            notify=Notify.model_validate(notify) if notify else None,
         ),
     )
     wake_dispatcher()

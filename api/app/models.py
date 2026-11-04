@@ -299,3 +299,22 @@ class Asset(Base):
     manual_fields: Mapped[list] = mapped_column(JsonType, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class Notification(Base):
+    """Уведомление пользователю из поля `notify` события (контракт v1.1, п. 6.3)."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("user_id", "event_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    # продукт-источник события (любой id из установки или platform)
+    product: Mapped[str] = mapped_column(String(20))
+    event_type: Mapped[str] = mapped_column(String(100))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    title: Mapped[str] = mapped_column(String(300))
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
