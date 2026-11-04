@@ -33,3 +33,22 @@ export const DELIVERY_STATUS: Record<string, { label: string; pill: string }> = 
   dead: { label: "Не доставлено", pill: "pill-danger" },
   none: { label: "Нет подписчиков", pill: "pill-muted" },
 };
+
+/** Критичность актива (женский род: «критичность»). */
+export const CRITICALITY: Record<string, string> = {
+  low: "Низкая",
+  medium: "Средняя",
+  high: "Высокая",
+  critical: "Критическая",
+};
+
+/** Поля актива для формы и сообщений. */
+export const ASSET_FIELDS: Record<string, string> = {
+  hostname: "Имя хоста",
+  os_family: "Семейство ОС",
+  os: "ОС",
+  owner: "Владелец",
+  criticality: "Критичность",
+  tags: "Теги",
+  groups: "Группы",
+};
