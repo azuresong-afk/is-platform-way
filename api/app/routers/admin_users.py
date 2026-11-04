@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import access, audit, products, sessions, users
+from .. import access, audit, events, products, sessions, users
 from ..db import aware, get_db, utcnow
 from ..deps import Principal, client_ip, require_admin
 from ..models import GroupMember, Project, ProjectMember, User, UserProductRole
@@ -232,6 +232,7 @@ def patch_user(
         setattr(user, field, value)
     if changes.get("is_active") is False:
         sessions.revoke_user(db, user.id, "user_blocked")
+        events.publish(db, "platform.user.blocked", {"sub": str(user.id)}, subject=f"user/{user.id}")
     audit.record(
         db,
         action="user.update",
