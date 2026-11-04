@@ -33,8 +33,9 @@ export function ProductsPage() {
       <PageHead breadcrumbs="Администрирование" title="Продукты" />
       <div className="alert-info">
         <div className="alert-body">
-          Продукт появляется в кабинете, если в окружении платформы задан его адрес (<code>SCANNER_API_UPSTREAM</code>,{" "}
-          <code>VM_API_UPSTREAM</code>, <code>GRC_API_UPSTREAM</code>). Манифест и состояние опрашиваются раз в минуту.
+          Продукт появляется в кабинете, если его id указан в <code>PLATFORM_PRODUCTS</code> в .env платформы и задан адрес{" "}
+          <code>&lt;ID&gt;_API_UPSTREAM</code>. Название, роли и вкладка берутся из манифеста продукта; манифест и
+          состояние опрашиваются раз в минуту.
         </div>
       </div>
       <section className="card">

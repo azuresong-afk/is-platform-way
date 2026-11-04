@@ -1,26 +1,10 @@
-import {
-  Empty,
-  formatDate,
-  formatDateTime,
-  formatNumber,
-  formatPercent,
-  iconByName,
-  Loading,
-  PageHead,
-  SEVERITIES,
-  SEVERITY_LABELS,
-  SeverityBadge,
-  SeverityBar,
-  type Severity,
-  useAuth,
-  useProject,
-} from "@platform/ui";
+import { Empty, formatDate, iconByName, Loading, PageHead, useAuth, useProject } from "@platform/ui";
 import { ArrowRight, FolderKanban, PlugZap, ShieldOff } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { MyProduct } from "../api";
 import { useShell } from "../components/ShellLayout";
-import { RUN_STATUS } from "../labels";
+import { safeLink, SummaryBody } from "../summaries";
 
 /** Сколько ждать сводку продукта, прежде чем показать «недоступен» (контракт v1.1, п. 10). */
 export const SUMMARY_TIMEOUT_MS = 5000;
@@ -155,11 +139,6 @@ function useSummary(product: MyProduct, projectId: string | null): [SummaryState
   return [state, () => setTick((t) => t + 1)];
 }
 
-/** Ссылка только на свой origin: продукт не должен уводить пользователя наружу. */
-function safeLink(link: unknown, fallback: string): string {
-  return typeof link === "string" && link.startsWith("/") && !link.startsWith("//") ? link : fallback;
-}
-
 function ProductCard({ product, projectId }: { product: MyProduct; projectId: string | null }) {
   const [state, retry] = useSummary(product, projectId);
   const Icon = iconByName(product.icon);
@@ -204,81 +183,5 @@ function ProductCard({ product, projectId }: { product: MyProduct; projectId: st
         )}
       </div>
     </section>
-  );
-}
-
-const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" ? (v as Record<string, unknown>) : null);
-
-function Stat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function SummaryBody({ productId, data }: { productId: string; data: Record<string, unknown> }) {
-  if (productId === "scanner") {
-    const open = obj(data.open) ?? {};
-    const counts = Object.fromEntries(SEVERITIES.map((s) => [s, num(open[s])])) as Record<Severity, number>;
-    const total = SEVERITIES.reduce((s, k) => s + counts[k], 0);
-    const run = obj(data.last_run);
-    const st = run ? RUN_STATUS[String(run.status)] : undefined;
-    return (
-      <div className="hero">
-        <div>
-          <div className="kpi-label">Открытые уязвимости</div>
-          <div className="kpi-value">{formatNumber(total)}</div>
-        </div>
-        <SeverityBar counts={counts} />
-        <div className="legend">
-          {SEVERITIES.filter((s) => s !== "info").map((s) => (
-            <span key={s} style={{ display: "inline-flex", gap: 6 }}>
-              <SeverityBadge level={s} label={SEVERITY_LABELS[s]} /> <span className="muted">{formatNumber(counts[s])}</span>
-            </span>
-          ))}
-        </div>
-        <dl className="stat-list">
-          <Stat
-            label="Последний прогон"
-            value={run ? <span className={`pill ${st?.pill ?? "pill-muted"}`}>{st?.label ?? String(run.status)}</span> : "—"}
-          />
-          {run && <Stat label="Завершён" value={formatDateTime(run.finished_at as string)} />}
-        </dl>
-      </div>
-    );
-  }
-  if (productId === "vm") {
-    const win = obj(data.next_window);
-    return (
-      <dl className="stat-list">
-        <Stat label="Открытые заявки" value={formatNumber(num(data.open_tickets))} />
-        <Stat label="Просрочено" value={formatNumber(num(data.overdue_tickets))} />
-        <Stat label="Подтверждено за неделю" value={formatNumber(num(data.verified_week))} />
-        <Stat label="Ближайшее окно" value={win ? formatDateTime(win.starts_at as string) : "—"} />
-      </dl>
-    );
-  }
-  if (productId === "grc") {
-    const docs = obj(data.documents) ?? {};
-    return (
-      <dl className="stat-list">
-        <Stat label="Объекты" value={formatNumber(num(data.systems))} />
-        <Stat label="Реализация мер" value={formatPercent(num(data.measures_percent))} />
-        <Stat label="Документы готовы" value={`${formatNumber(num(docs.ready))} из ${formatNumber(num(docs.total))}`} />
-      </dl>
-    );
-  }
-  // Неизвестный продукт: показываем числовые поля как есть.
-  return (
-    <dl className="stat-list">
-      {Object.entries(data)
-        .filter(([, v]) => typeof v === "number")
-        .map(([k, v]) => (
-          <Stat key={k} label={k} value={formatNumber(v as number)} />
-        ))}
-    </dl>
   );
 }

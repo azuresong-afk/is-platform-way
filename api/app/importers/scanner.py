@@ -32,12 +32,12 @@ from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import Session
 
 from .. import audit
+from ..builtin_manifests import BUILTIN_MANIFESTS
 from ..models import Project, ProjectLink, ProjectMember, User, UserProductRole
-from ..products import DEFAULT_MANIFESTS
 from ..security.passwords import _parse
 
 PRODUCT = "scanner"
-SCANNER_ROLES = frozenset(DEFAULT_MANIFESTS[PRODUCT]["roles"])
+SCANNER_ROLES = frozenset(BUILTIN_MANIFESTS[PRODUCT]["roles"])
 ADDON_ROLES = ("cred_audit", "host_credentials")
 
 # Имена-кандидаты: первое найденное в таблице побеждает.
