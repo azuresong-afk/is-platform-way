@@ -17,3 +17,12 @@ playwright-report/
 test-results/
 storybook-static/
 backups/
+dist-showcase/
+deploy/tls/*.pem
+
+# Комплект: сгенерированный compose, собственные настройки продуктов, резервные копии
+deploy/.generated/
+deploy/env/*.env
+!deploy/env/example.env
+deploy/docker-compose.suite.override.yml
+backups/

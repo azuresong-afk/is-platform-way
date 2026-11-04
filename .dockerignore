@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/dist-showcase
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+.env
+docs/screenshots
+backups
