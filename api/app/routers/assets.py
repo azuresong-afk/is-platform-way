@@ -90,9 +90,7 @@ def _project(db: Session, project_id: uuid.UUID, p: Principal) -> Project:
     if proj is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Проект не найден")
     # Читать реестр может участник проекта (продукты ходят с токеном пользователя) и администратор.
-    if not (
-        p.user.is_platform_admin or access.can_access_project(access.effective_projects(db, p.user), proj.id)
-    ):
+    if not (p.admin or access.can_access_project(access.effective_projects(db, p.user), proj.id)):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="no_project_access")
     return proj
 

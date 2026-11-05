@@ -6,6 +6,8 @@ import {
   decodeClaims,
   type FetchOptions,
   getToken,
+  isPlatformApiUrl,
+  isTokenExpired,
   logout as doLogout,
   onLogoutElsewhere,
   redirectToLogin,
@@ -50,15 +52,16 @@ export interface AuthProviderProps {
   permissions?: Record<string, string[]>;
   /** false — не уводить на страницу входа (сама страница входа). */
   requireAuth?: boolean;
+  /**
+   * Только для оболочки платформы: fetch/json ходят в /api/platform/* с токеном оболочки
+   * (aud=["platform"], контракт v1.1, п. 2.6), а в API продуктов — с токеном из sessionStorage.
+   */
+  platformToken?: boolean;
 }
 
-function isExpired(claims: TokenClaims | null): boolean {
-  return !claims?.exp || claims.exp * 1000 <= Date.now() + 5_000;
-}
-
-export function AuthProvider({ children, product, permissions, requireAuth = true }: AuthProviderProps) {
+export function AuthProvider({ children, product, permissions, requireAuth = true, platformToken = false }: AuthProviderProps) {
   const [token, setTokenState] = useState<string | null>(getToken);
-  const [ready, setReady] = useState<boolean>(() => !isExpired(decodeClaims(getToken())));
+  const [ready, setReady] = useState<boolean>(() => !isTokenExpired(decodeClaims(getToken())));
 
   useEffect(() => {
     const onToken = () => setTokenState(getToken());
@@ -96,6 +99,17 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
     [roles, permissions],
   );
 
+  const scopedFetch = useCallback(
+    (url: string, options: FetchOptions = {}) =>
+      apiFetch(url, { ...options, platform: options.platform ?? (platformToken && isPlatformApiUrl(url)) }),
+    [platformToken],
+  );
+  const scopedJson = useCallback(
+    <T,>(url: string, options: FetchOptions = {}) =>
+      apiJson<T>(url, { ...options, platform: options.platform ?? (platformToken && isPlatformApiUrl(url)) }),
+    [platformToken],
+  );
+
   const value = useMemo<AuthState>(
     () => ({
       ready,
@@ -111,11 +125,11 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
       has,
       hasProduct: (id: string) => (products[id] ?? []).length > 0,
       canProject: (id) => Boolean(id) && ((claims?.projects ?? []).includes("*") || (claims?.projects ?? []).includes(id!)),
-      fetch: apiFetch,
-      json: apiJson,
+      fetch: scopedFetch,
+      json: scopedJson,
       logout: () => doLogout(),
     }),
-    [ready, token, claims, roles, products, has],
+    [ready, token, claims, roles, products, has, scopedFetch, scopedJson],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -66,7 +66,7 @@ describe("Ключи подписи", () => {
     expect(within(row).getByText("Опубликован заранее")).toBeInTheDocument();
     expect(within(row).getByText(/станет активным/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Плановая смена" })).toBeDisabled();
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const post = fetchMock.mock.calls.find(([u, init]) => init?.method === "POST" && !String(u).includes("/auth/"));
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ mode: "scheduled", revoke_previous: false });
   });
 
@@ -94,7 +94,7 @@ describe("Ключи подписи", () => {
 
     expect(await screen.findByText(/прежний отозван/)).toBeInTheDocument();
     expect(screen.getByText("Отозван")).toBeInTheDocument();
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const post = fetchMock.mock.calls.find(([u, init]) => init?.method === "POST" && !String(u).includes("/auth/"));
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ mode: "immediate", revoke_previous: true });
   });
 

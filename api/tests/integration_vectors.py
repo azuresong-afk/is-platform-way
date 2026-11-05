@@ -33,7 +33,6 @@ SVC_SUB = "svc:0b5e7a2c-91d4-4c3f-a8e6-2f7b9d1c4e50"
 PROJECT_A = "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
 PROJECT_B = "9a7c5e3b-1d2f-4b6a-8c0e-4f6a8b0c2d93"
 PRODUCTS = ["scanner", "vm", "grc"]
-ALL_PRODUCTS = [*PRODUCTS, "platform"]
 
 # Секреты HMAC событий — только для векторов, в установках не использовать.
 EVENTS_SECRETS = {
@@ -88,7 +87,8 @@ def _user_claims(**over) -> dict:
         "iss": "platform",
         "sub": USER_SUB,
         "typ": "user",
-        "aud": ALL_PRODUCTS,
+        # Платформы в aud нет (контракт v1.1, п. 2.6).
+        "aud": PRODUCTS,
         "preferred_username": "ivanov",
         "name": "Иванов И. И.",
         "auth_source": "local",
@@ -219,7 +219,7 @@ def jwt_cases() -> list[dict]:
         },
         {
             "name": "wrong_aud",
-            "description": 'aud = ["platform"]: роли scanner есть, но своего id в aud нет — 401.',
+            "description": 'aud = ["platform"] (токен оболочки, п. 2.6): своего id в aud нет — 401.',
             "token": _encode(_user_claims(aud=["platform"], jti=_jti(0x08))),
             "checks": _invalid_everywhere(),
         },

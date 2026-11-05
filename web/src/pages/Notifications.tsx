@@ -38,7 +38,7 @@ export function NotificationsPage() {
     const params = new URLSearchParams({ limit: String(LIMIT), offset: String(offset) });
     if (onlyUnread) params.set("unread", "true");
     if (product) params.set("product", product);
-    apiFetch(`${API}/notifications?${params}`)
+    apiFetch(`${API}/notifications?${params}`, { platform: true })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Ошибка ${r.status}`);
         setData({

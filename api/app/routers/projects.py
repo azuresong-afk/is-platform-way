@@ -125,10 +125,7 @@ def my_projects(
 def get_project(
     project_id: uuid.UUID, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
-    if not (
-        p.user.is_platform_admin
-        or access.can_access_project(access.effective_projects(db, p.user), project_id)
-    ):
+    if not (p.admin or access.can_access_project(access.effective_projects(db, p.user), project_id)):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="no_project_access")
     return project_out(_get(db, project_id))
 

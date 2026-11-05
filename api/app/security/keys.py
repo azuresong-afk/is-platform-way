@@ -287,8 +287,11 @@ def sign(db: Session, claims: dict[str, Any], ttl_seconds: int | None = None) ->
     return jwt.encode(payload, _private(key), algorithm="EdDSA", headers={"kid": key.kid, "typ": "JWT"})
 
 
-def verify(db: Session, token: str, audience: str = "platform") -> dict[str, Any]:
-    """Проверка токена, выданного платформой. Бросает jwt.InvalidTokenError."""
+def verify(db: Session, token: str, audience: str | list[str] = "platform") -> dict[str, Any]:
+    """Проверка токена, выданного платформой (aud — хоть одно из audience).
+
+    Бросает jwt.InvalidTokenError.
+    """
     header = jwt.get_unverified_header(token)
     if header.get("alg") != "EdDSA":
         raise jwt.InvalidAlgorithmError("ожидается EdDSA")

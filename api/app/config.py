@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     issuer: str = "platform"
 
     access_ttl_seconds: int = 900
+    # Токен оболочки для API платформы (aud=["platform"], docs/SECURITY.md, п. 11): живёт только в памяти
+    # вкладки и выдаётся по refresh-cookie без её ротации, поэтому короче обычного.
+    platform_token_ttl_seconds: int = 300
     refresh_ttl_hours: int = 12
     refresh_max_days: int = 7
     # Окно, в которое повторное предъявление refresh-токена считается гонкой

@@ -34,7 +34,7 @@ def _jwks() -> dict:
 def token(
     products: dict,
     projects=None,
-    aud=("scanner", "vm", "grc", "demo", "platform"),
+    aud=("scanner", "vm", "grc", "demo"),
     exp_in=900,
     key=KEY,
     kid=KID,

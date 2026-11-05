@@ -60,7 +60,7 @@ describe("События", () => {
     expect(document.querySelector("img")).toBeNull();
     await user.click(within(dialog).getByRole("button", { name: /Отправить ещё раз/ }));
     expect(await within(dialog).findByText("Поставлено в очередь на отправку.")).toBeInTheDocument();
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const post = fetchMock.mock.calls.find(([u, init]) => init?.method === "POST" && !String(u).includes("/auth/"));
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ subscription_id: "s1" });
   });
 });
