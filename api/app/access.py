@@ -48,7 +48,7 @@ def effective_projects(db: Session, user: User) -> list[str]:
 
 
 def user_claims(db: Session, user: User) -> dict:
-    """Утверждения access-токена пользователя (контракт v1, п. 2; v1.1, п. 2.1, 2.3).
+    """Утверждения access-токена пользователя (контракт v1, п. 2; v1.1, п. 2.1, 2.3, 2.6).
 
     Временный пароль (задан администратором) — токен без ролей, проектов и прав администратора,
     с ``password_change_required``: пароль знает администратор, и войти под ним он не должен
@@ -58,7 +58,7 @@ def user_claims(db: Session, user: User) -> dict:
         return {
             "sub": str(user.id),
             "typ": "user",
-            "aud": [*products.enabled_ids(db), "platform"],
+            "aud": products.enabled_ids(db),
             "preferred_username": user.username,
             "name": user.display_name,
             "auth_source": user.auth_source,
@@ -70,14 +70,30 @@ def user_claims(db: Session, user: User) -> dict:
     return {
         "sub": str(user.id),
         "typ": "user",
-        # Все продукты установки + сама платформа: отсутствие ролей продукт превращает в 403.
-        "aud": [*products.enabled_ids(db), "platform"],
+        # Все продукты установки: отсутствие ролей продукт превращает в 403. Платформы в aud нет —
+        # этот токен уходит в бэкенды продуктов и не должен открывать администрирование (п. 11 SECURITY.md).
+        "aud": products.enabled_ids(db),
         "preferred_username": user.username,
         "name": user.display_name,
         "auth_source": user.auth_source,
         "products": effective_roles(db, user),
         "projects": effective_projects(db, user),
         "platform_admin": user.is_platform_admin,
+    }
+
+
+def platform_claims(user: User) -> dict:
+    """Короткий токен оболочки для API платформы (контракт v1.1, п. 2.6): только в памяти вкладки."""
+    return {
+        "sub": str(user.id),
+        "typ": "user",
+        "aud": ["platform"],
+        "preferred_username": user.username,
+        "name": user.display_name,
+        "auth_source": user.auth_source,
+        # Временный пароль: прав администратора нет до смены (docs/SECURITY.md, п. 6).
+        "platform_admin": user.is_platform_admin and not user.password_temporary,
+        **({"password_change_required": True} if user.password_temporary else {}),
     }
 
 

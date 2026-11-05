@@ -7,10 +7,22 @@ from http.cookies import SimpleCookie
 import jwt
 
 
-def login(client, username="admin", password="admin-password-1"):
+def login(client, username="admin", password="admin-password-1", platform=True):
+    """Вход. platform=True — токен оболочки (aud=["platform"]), как у кабинета платформы;
+    False — токен из ответа входа (aud — продукты), как в sessionStorage."""
     r = client.post("/auth/login", json={"username": username, "password": password})
     assert r.status_code == 200, r.text
-    return r.json()["access_token"], refresh_cookie(r)
+    cookie = refresh_cookie(r)
+    if not platform:
+        return r.json()["access_token"], cookie
+    return platform_token(client, cookie), cookie
+
+
+def platform_token(client, cookie) -> str:
+    client.cookies.clear()
+    r = client.post("/auth/platform-token", headers={"cookie": f"platform_refresh={cookie}"})
+    assert r.status_code == 200, r.text
+    return r.json()["access_token"]
 
 
 def refresh_cookie(response) -> str | None:

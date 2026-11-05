@@ -61,13 +61,14 @@
 
 ```json
 {"iss":"platform","sub":"6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b","typ":"user",
- "aud":["scanner","vm","grc","platform"],
+ "aud":["scanner","vm","grc"],
  "preferred_username":"ivanov","name":"Иванов И. И.","auth_source":"local",
  "products":{"scanner":["operator","cred_audit"],"vm":["engineer"]},
  "projects":["3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"],"platform_admin":false,
  "iat":1793808000,"exp":1793808900,"jti":"…"}
 ```
 
+- `aud` — все продукты установки. `"platform"` в нём нет (контракт v1.1, п. 2.6): токен пользователя, пришедший в ваш бэкенд, не открывает администрирование платформы, даже если пользователь — её администратор (`401 platform_token_required`). Вызовы `/me`, `/projects/{id}`, `/projects/{id}/assets` с ним работают, как раньше. Токен с `aud: ["platform"]` — токен оболочки, вам он не приходит; если пришёл — `401`, как в векторе `wrong_aud`.
 - `typ` — `user` или `service`; нет поля — считать `user`. `auth_source`, `platform_admin` — информационные, права на них не строить.
 - `password_change_required: true` — пароль задал администратор и пользователь его ещё не сменил (контракт v1.1, п. 2.3). Роли в таком токене пустые, так что проверка 6 выше уже даёт 403; отдельно обрабатывать не нужно. `AuthProvider` из `@platform/ui` с `product` уводит такого пользователя на смену пароля в оболочке.
 - Роли берите **только** из `products.<свой id>` и вычисляйте права из них на каждый запрос, как сейчас. Роли других продуктов игнорируйте.

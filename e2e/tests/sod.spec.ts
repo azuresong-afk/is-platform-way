@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { expect, type Page, request as apiRequest, test } from "@playwright/test";
 
-import { login, tabs } from "./stand";
+import { login, platformToken, tabs } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -39,8 +39,8 @@ async function shots(page: Page, name: string, ready: () => Promise<void>) {
 
 test("временный пароль: без ролей до смены, после смены — продукты", async ({ page, baseURL }) => {
   const ctx = await apiRequest.newContext({ baseURL });
-  const r = await ctx.post("/api/platform/auth/login", { data: { username: ADMIN.username, password: ADMIN.password } });
-  const adminToken = (await r.json()).access_token as string;
+  // Администрирование — только с токеном оболочки (aud=["platform"], контракт v1.1, п. 2.6).
+  const adminToken = await platformToken(ctx, ADMIN);
   const call = async <T>(method: string, path: string, data?: unknown) => {
     const res = await ctx.fetch(`/api/platform${path}`, { method, data, headers: { Authorization: `Bearer ${adminToken}` } });
     expect(res.ok(), `${method} ${path}: ${res.status()} ${await res.text()}`).toBeTruthy();

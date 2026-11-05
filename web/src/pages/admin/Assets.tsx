@@ -448,6 +448,7 @@ function ImportModal({ open, projectId, onClose, onDone }: { open: boolean; proj
       const r = await apiJson<ImportReport>(`${API}/projects/${projectId}/assets/import${dryRun ? "?dry_run=true" : ""}`, {
         method: "POST",
         body,
+        platform: true,
       });
       setReport(r);
       if (!dryRun) onDone();

@@ -21,7 +21,7 @@ def test_team_role_reaches_token_on_refresh_and_leaves_after_removal(client):
     u = _mk_user(client, h)
     p = _mk_project(client, h)
     g = _group(client, h)
-    token, cookie = login(client, "ivanov", "long-password-1")
+    token, cookie = login(client, "ivanov", "long-password-1", platform=False)
     assert claims(token)["products"] == {}
 
     assert (

@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { expect, type Page, request as apiRequest, test } from "@playwright/test";
 
-import { adoptPassword, login, temporaryPassword } from "./stand";
+import { adoptPassword, login, platformToken, temporaryPassword } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -27,9 +27,7 @@ const claims = (token: string) => JSON.parse(Buffer.from(token.split(".")[1], "b
 
 async function api(baseURL: string) {
   const ctx = await apiRequest.newContext({ baseURL });
-  const r = await ctx.post("/api/platform/auth/login", { data: { username: ADMIN.username, password: ADMIN.password } });
-  expect(r.ok()).toBeTruthy();
-  const token = (await r.json()).access_token as string;
+  const token = await platformToken(ctx, ADMIN);
   const call = async <T>(method: string, path: string, data?: unknown): Promise<{ status: number; body: T }> => {
     const res = await ctx.fetch(`/api/platform${path}`, { method, data, headers: { Authorization: `Bearer ${token}` } });
     return { status: res.status(), body: (res.status() === 204 ? null : await res.json()) as T };

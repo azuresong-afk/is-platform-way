@@ -101,7 +101,7 @@ def test_platform_tokens_follow_vector_shape(client, db):
     """Настоящий токен платформы содержит те же утверждения, что и векторы."""
     from tests.helpers import claims, login
 
-    access, _ = login(client)
+    access, _ = login(client, platform=False)
     got = claims(access)
     header = jwt.get_unverified_header(access)
     assert header["alg"] == "EdDSA" and header["kid"]

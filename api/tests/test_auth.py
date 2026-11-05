@@ -22,8 +22,8 @@ def test_login_issues_eddsa_token_verifiable_by_jwks(client):
     data = jwt.decode(token, jwt.PyJWK(jwk).key, algorithms=["EdDSA"], audience="scanner")
     assert data["iss"] == "platform"
     assert data["exp"] - data["iat"] == 900
-    # aud — все продукты установки + платформа (grc в тестах не установлен).
-    assert data["aud"] == ["scanner", "vm", "platform"]
+    # aud — все продукты установки, без платформы (grc в тестах не установлен; п. 2.1, 2.6).
+    assert data["aud"] == ["scanner", "vm"]
     assert data["preferred_username"] == "admin" and data["typ"] == "user"
     assert data["products"] == {} and data["projects"] == []
     attrs = cookie_attrs(r).lower()
@@ -52,7 +52,7 @@ def test_token_contains_roles_and_projects(client, db):
     )
     u.all_projects = True
     db.commit()
-    token, _ = login(client, "op", "pw-123456")
+    token, _ = login(client, "op", "pw-123456", platform=False)
     c = claims(token)
     assert c["products"] == {"scanner": ["operator"], "vm": ["engineer"]}
     assert c["projects"] == ["*"]

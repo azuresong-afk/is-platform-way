@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 
-import { adoptPassword, expectProductPage, login, PRODUCTS, seed, tabs, temporaryPassword, trackConsoleErrors } from "./stand";
+import { adoptPassword, expectProductPage, login, platformToken, PRODUCTS, seed, tabs, temporaryPassword, trackConsoleErrors } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -52,7 +52,7 @@ async function token(request: APIRequestContext, user: { username: string; passw
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 async function admin(request: APIRequestContext) {
-  const t = await token(request, ADMIN);
+  const t = await platformToken(request, ADMIN);
   const call = async <T = unknown>(method: string, path: string, data?: unknown): Promise<T> => {
     const r = await request.fetch(`/api/platform${path}`, { method, headers: bearer(t), data });
     expect(r.ok(), `${method} ${path}: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -345,7 +345,7 @@ test.describe("docs/TESTING.md", () => {
     await page.goto("/admin/users");
     await page.getByRole("cell", { name: ADMIN.username }).first().click();
     await expect(page.getByText("Разделение обязанностей")).toBeVisible();
-    const t = await token(request, ADMIN);
+    const t = await platformToken(request, ADMIN);
     const sub = String(claims(t).sub);
     const roles = await request.put(`/api/platform/admin/users/${sub}/roles`, {
       headers: bearer(t),

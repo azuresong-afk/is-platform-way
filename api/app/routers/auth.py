@@ -141,6 +141,46 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     return out
 
 
+class PlatformTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+
+
+@router.post(
+    "/auth/platform-token",
+    response_model=PlatformTokenOut,
+    responses={401: {"description": "Сессия недействительна"}},
+)
+def platform_token(request: Request, db: Session = Depends(get_db)):
+    """Токен оболочки для API платформы (контракт v1.1, п. 2.6): aud=["platform"], по refresh-cookie.
+
+    Cookie не ротируется (ротацию ведёт /auth/refresh), но проверяется по тем же правилам:
+    повторное предъявление использованной cookie отзывает семейство.
+    """
+    s = get_settings()
+    user, rec, err = sessions.check(db, request.cookies.get(s.refresh_cookie_name))
+    if err is not None or user is None:
+        if err == sessions.RefreshError.REUSED and rec is not None:
+            audit.record(
+                db,
+                action="auth.refresh_reuse",
+                actor_sub=str(rec.user_id),
+                result="denied",
+                ip=client_ip(request),
+                details={"family_id": str(rec.family_id)},
+            )
+        db.commit()
+        detail = err.value if err else "invalid"
+        return JSONResponse({"detail": detail}, status_code=401, headers={"Cache-Control": "no-store"})
+    token = keys.sign(db, access.platform_claims(user), ttl_seconds=s.platform_token_ttl_seconds)
+    db.commit()
+    return JSONResponse(
+        PlatformTokenOut(access_token=token, expires_in=s.platform_token_ttl_seconds).model_dump(),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 class ServiceTokenOut(BaseModel):
     access_token: str
     token_type: str = "Bearer"

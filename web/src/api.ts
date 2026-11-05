@@ -1,4 +1,7 @@
-/** Типы и вызовы API платформы (через шлюз: /api/platform). */
+/**
+ * Типы и вызовы API платформы (через шлюз: /api/platform). Оболочка ходит сюда с токеном оболочки
+ * (aud=["platform"], в памяти вкладки; контракт v1.1, п. 2.6), а не с токеном из sessionStorage.
+ */
 import { apiFetch, apiJson, PLATFORM_API } from "@platform/ui";
 
 export const API = PLATFORM_API;
@@ -186,7 +189,7 @@ export interface Paged<T> {
 }
 
 export async function paged<T>(url: string): Promise<Paged<T>> {
-  const r = await apiFetch(url);
+  const r = await apiFetch(url, { platform: true });
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));
     throw new Error(typeof body.detail === "string" ? body.detail : `Ошибка ${r.status}`);
@@ -194,9 +197,9 @@ export async function paged<T>(url: string): Promise<Paged<T>> {
   return { items: (await r.json()) as T[], total: Number(r.headers.get("X-Total-Count") ?? 0) };
 }
 
-export const get = <T,>(path: string) => apiJson<T>(`${API}${path}`);
+export const get = <T,>(path: string) => apiJson<T>(`${API}${path}`, { platform: true });
 export const send = <T,>(method: string, path: string, json?: unknown) =>
-  apiJson<T>(`${API}${path}`, { method, json });
+  apiJson<T>(`${API}${path}`, { method, json, platform: true });
 
 /** Текст ошибки API для человека: detail строкой или первая ошибка валидации. */
 export function errorText(e: unknown): string {

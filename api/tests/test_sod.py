@@ -10,7 +10,16 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.models import AuditLog
-from tests.helpers import bearer, change_password, claims, do_refresh, login, make_user, refresh_cookie
+from tests.helpers import (
+    bearer,
+    change_password,
+    claims,
+    do_refresh,
+    login,
+    make_user,
+    platform_token,
+    refresh_cookie,
+)
 from tests.test_groups import _group
 from tests.test_service_accounts import create as create_sa
 
@@ -64,14 +73,14 @@ def test_admin_reset_of_working_user_makes_password_temporary_again(client, db):
     h = _admin(client)
     u = make_user(client, h, "ivanov")
     client.put(f"/admin/users/{u['id']}/roles", json={"products": ROLES}, headers=h)
-    token, _ = login(client, "ivanov", "long-password-1")
+    token, _ = login(client, "ivanov", "long-password-1", platform=False)
     assert claims(token)["products"] == ROLES
 
     r = client.post(f"/admin/users/{u['id']}/password", json={"password": "admin-knows-it-1"}, headers=h)
     assert r.status_code == 204
     assert _sod(db, "user.password") == [True]
     # вход под записью с паролем от администратора ролей не даёт
-    t2, _ = login(client, "ivanov", "admin-knows-it-1")
+    t2, _ = login(client, "ivanov", "admin-knows-it-1", platform=False)
     assert claims(t2)["products"] == {}
     # уже выданный токен для API платформы перестаёт работать сразу (сверка с БД)
     assert client.get("/products", headers=bearer(token)).json()["detail"] == "password_change_required"
@@ -83,7 +92,8 @@ def test_new_platform_admin_with_temporary_password_has_no_admin_rights(client):
     t, _ = login(client, "second", "tmp-long-password-1")
     assert claims(t)["platform_admin"] is False
     assert client.get("/admin/users", headers=bearer(t)).status_code == 403
-    t, _ = change_password(client, "second", "tmp-long-password-1", "second-own-password-1")
+    _, cookie = change_password(client, "second", "tmp-long-password-1", "second-own-password-1")
+    t = platform_token(client, cookie)
     assert claims(t)["platform_admin"] is True
     assert client.get("/admin/users", headers=bearer(t)).status_code == 200
 

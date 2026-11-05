@@ -90,8 +90,8 @@ def test_new_product_gets_placeholder_then_real_manifest(client, db):
     u = make_user(client, h, "demouser")
     r = client.put(f"/admin/users/{u['id']}/roles", json={"products": {"demo": ["viewer"]}}, headers=h)
     assert r.status_code == 200, r.text
-    token = login(client, "demouser", "long-password-1")[0]
-    assert claims(token)["aud"] == ["scanner", "vm", "demo", "platform"]
+    token = login(client, "demouser", "long-password-1", platform=False)[0]
+    assert claims(token)["aud"] == ["scanner", "vm", "demo"]
     assert claims(token)["products"] == {"demo": ["viewer"]}
     tabs = client.get("/products", headers=bearer(token)).json()
     assert [t["id"] for t in tabs] == ["demo"] and tabs[0]["title"] == "Демо"
