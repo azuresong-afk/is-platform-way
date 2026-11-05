@@ -6,6 +6,8 @@
 
 ### Добавлено
 - `NotificationBell`: колокольчик с числом непрочитанных и выпадающей панелью последних уведомлений (API платформы, опрос раз в минуту); `NotificationRow`, `safeLink`, `notificationsChanged`, `NOTIFICATIONS_EVENT`, тип `NotificationItem`.
+- Временный пароль (контракт v1.1, п. 2.3; docs/SECURITY.md, п. 6): `useAuth().passwordChangeRequired`; `AuthProvider` с `product` уводит такого пользователя на `/password?next=…` в оболочке (адрес — проп `passwordHref`). В `TokenClaims` — `auth_source` и `password_change_required`.
+- `UserMenu`: пункт «Сменить пароль» (`passwordHref`); `PlatformTabs` показывает его записям платформы (`auth_source=local`).
 - Выход отовсюду (контракт v1.1, п. 2.4, 11): `logout()` пишет сигнал `localStorage['platform.logout']`, `AuthProvider` слушает его и уводит остальные вкладки на вход. Для своих фронтендов — `onLogoutElsewhere()` и ключ `LOGOUT_KEY`.
 
 ### Безопасность

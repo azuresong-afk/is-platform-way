@@ -71,7 +71,24 @@ def _grants_something(db: Session, gid: uuid.UUID) -> bool:
     )
 
 
-def _audit(db, p: Principal, request: Request, action: str, g: Group, details: dict | None = None) -> None:
+def _with_temporary_password(db: Session, ids: set[uuid.UUID]) -> bool:
+    """Есть ли среди пользователей запись с временным паролем (его знает администратор)."""
+    if not ids:
+        return False
+    return bool(
+        db.scalar(select(User.id).where(User.id.in_(ids), User.password_temporary.is_(True)).limit(1))
+    )
+
+
+def _audit(
+    db,
+    p: Principal,
+    request: Request,
+    action: str,
+    g: Group,
+    details: dict | None = None,
+    sod: bool = False,
+) -> None:
     audit.record(
         db,
         action=action,
@@ -80,6 +97,7 @@ def _audit(db, p: Principal, request: Request, action: str, g: Group, details: d
         object=f"group/{g.name}",
         ip=client_ip(request),
         details=details or {},
+        sod=sod,
     )
 
 
@@ -164,6 +182,7 @@ def set_members(
             "added": sorted(str(x) for x in wanted - current),
             "removed": sorted(str(x) for x in current - wanted),
         },
+        sod=_with_temporary_password(db, wanted - current) and _grants_something(db, gid),
     )
     db.commit()
     return group_out(db, g)
@@ -188,7 +207,16 @@ def set_roles(
             )
         )
         db.add_all(GroupProductRole(group_id=gid, product_id=pid, role=r) for r in clean.get(pid, []))
-    _audit(db, p, request, "group.roles", g, {"after": clean})
+    members = set(db.scalars(select(GroupMember.user_id).where(GroupMember.group_id == gid)))
+    _audit(
+        db,
+        p,
+        request,
+        "group.roles",
+        g,
+        {"after": clean},
+        sod=bool(clean) and _with_temporary_password(db, members),
+    )
     db.commit()
     return group_out(db, g)
 

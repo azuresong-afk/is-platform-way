@@ -13,12 +13,19 @@ export interface PlatformTabsProps {
   apiBase?: string;
   /** Страница всех уведомлений (в оболочке платформы). */
   notificationsHref?: string;
+  /** Смена пароля в оболочке платформы; пункт меню есть только у записей платформы (auth_source=local). */
+  passwordHref?: string;
   /** @deprecated Счётчик колокольчик берёт сам из API платформы; значение игнорируется. */
   unread?: number;
 }
 
 /** Строка вкладок с данными платформы: GET /api/platform/products (только продукты с ролями). */
-export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref = "/notifications" }: PlatformTabsProps) {
+export function PlatformTabs({
+  active,
+  apiBase = PLATFORM_API,
+  notificationsHref = "/notifications",
+  passwordHref = "/password",
+}: PlatformTabsProps) {
   const auth = useAuth();
   const { projectId } = useProject();
   const [products, setProducts] = useState<TabProduct[]>([]);
@@ -45,7 +52,14 @@ export function PlatformTabs({ active, apiBase = PLATFORM_API, notificationsHref
       right={
         <>
           <NotificationBell apiBase={apiBase} href={notificationsHref} />
-          {auth.user && <UserMenu name={auth.user.name} subtitle={auth.user.username} onLogout={auth.logout} />}
+          {auth.user && (
+            <UserMenu
+              name={auth.user.name}
+              subtitle={auth.user.username}
+              onLogout={auth.logout}
+              passwordHref={auth.claims?.auth_source === "local" ? passwordHref : undefined}
+            />
+          )}
         </>
       }
     />

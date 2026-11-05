@@ -38,6 +38,7 @@ def create_user(
     password: str | None = None,
     password_hash: str | None = None,
     is_platform_admin: bool = False,
+    password_temporary: bool = False,
 ) -> User:
     user = User(
         username=normalize_username(username),
@@ -45,6 +46,7 @@ def create_user(
         email=email,
         password_hash=password_hash or (passwords.hash_password(password) if password else None),
         is_platform_admin=is_platform_admin,
+        password_temporary=password_temporary and bool(password),
     )
     db.add(user)
     db.flush()

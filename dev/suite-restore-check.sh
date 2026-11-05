@@ -115,8 +115,12 @@ ADMIN_TOKEN="$(admin_login admin "$ADMIN_PW")"
 PROJECT_ID="$(api POST /api/platform/admin/projects "$ADMIN_TOKEN" '{"name":"Проверка восстановления","client":"ООО Ромашка"}' | jget 'd["id"]')"
 [ "$(code)" = 201 ] || fail "создание проекта: $(code)"
 ok "проект $PROJECT_ID"
-USER_ID="$(api POST /api/platform/admin/users "$ADMIN_TOKEN" "{\"username\":\"ivanov\",\"display_name\":\"Иванов И. И.\",\"password\":\"$USER_PW\"}" | jget 'd["id"]')"
+USER_ID="$(api POST /api/platform/admin/users "$ADMIN_TOKEN" "{\"username\":\"ivanov\",\"display_name\":\"Иванов И. И.\",\"password\":\"tmp-$USER_PW\"}" | jget 'd["id"]')"
 [ "$(code)" = 201 ] || fail "создание пользователя: $(code)"
+# Пароль от администратора временный (docs/SECURITY.md, п. 6): пользователь сам меняет его при входе.
+api POST /api/platform/auth/password "$(login ivanov "tmp-$USER_PW")" \
+  "{\"current_password\":\"tmp-$USER_PW\",\"new_password\":\"$USER_PW\"}" >/dev/null
+[ "$(code)" = 200 ] || fail "смена временного пароля: $(code) $(cat "$WORK/body")"
 for _ in $(seq 1 30); do # роли проверяются по манифесту продукта — ждём, пока платформа его прочитает
   api PUT "/api/platform/admin/users/$USER_ID/roles" "$ADMIN_TOKEN" \
     '{"products":{"scanner":["operator"],"vm":["engineer"],"grc":["methodologist"]}}' >/dev/null
