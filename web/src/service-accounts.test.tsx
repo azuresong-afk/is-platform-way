@@ -62,7 +62,7 @@ describe("Сервисные учётные записи", () => {
     await user.click(screen.getByRole("button", { name: "Создать и показать секрет" }));
 
     expect(await screen.findByTestId("svc-secret")).toHaveTextContent("psk_SECRET");
-    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const post = fetchMock.mock.calls.find(([u, init]) => init?.method === "POST" && !String(u).includes("/auth/"));
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
       client_id: "vm-to-scanner",
       target_product: "scanner",

@@ -47,7 +47,7 @@ export function App() {
         <Route
           path="*"
           element={
-            <AuthProvider>
+            <AuthProvider platformToken>
               <Authed />
             </AuthProvider>
           }

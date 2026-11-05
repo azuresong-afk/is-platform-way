@@ -80,6 +80,14 @@ api() { # api METHOD PATH TOKEN [BODY] → тело; код ответа в $WOR
 }
 code() { cat "$WORK/code"; }
 login() { api POST /api/platform/auth/login "" "{\"username\":\"$1\",\"password\":\"$2\"}" | jget 'd["access_token"]'; }
+# Токен оболочки для API администрирования (aud=["platform"], контракт v1.1, п. 2.6): вход с cookie refresh
+# и POST /auth/platform-token. Токен из login() на /api/platform/admin/* получает 401.
+admin_login() {
+  local jar="$WORK/cookies.$1"
+  curl -sS -o /dev/null -c "$jar" -X POST "$GW/api/platform/auth/login" \
+    -H 'Content-Type: application/json' --data "{\"username\":\"$1\",\"password\":\"$2\"}"
+  curl -sS -b "$jar" -X POST "$GW/api/platform/auth/platform-token" | jget 'd["access_token"]'
+}
 db_sql() { # db_sql STAND DB SQL — от суперпользователя
   stand "$1" exec -T db psql -X -U postgres -d "$2" -At -v ON_ERROR_STOP=1 -c "$3"
 }
@@ -102,7 +110,7 @@ stand suite-check-a up -d --wait --wait-timeout 300 >&2
 ok "все сервисы healthy"
 
 step "Стенд A: данные"
-ADMIN_TOKEN="$(login admin "$ADMIN_PW")"
+ADMIN_TOKEN="$(admin_login admin "$ADMIN_PW")"
 [ -n "$ADMIN_TOKEN" ] || fail "вход администратора"
 PROJECT_ID="$(api POST /api/platform/admin/projects "$ADMIN_TOKEN" '{"name":"Проверка восстановления","client":"ООО Ромашка"}' | jget 'd["id"]')"
 [ "$(code)" = 201 ] || fail "создание проекта: $(code)"
@@ -152,7 +160,7 @@ ok "восстановление завершено, комплект запущ
 step "Стенд B: проверки"
 api GET /api/platform/health/ready "" >/dev/null
 [ "$(code)" = 200 ] || fail "API платформы не готов"
-ADMIN_TOKEN_B="$(login admin "$ADMIN_PW")"
+ADMIN_TOKEN_B="$(admin_login admin "$ADMIN_PW")"
 [ -n "$ADMIN_TOKEN_B" ] || fail "вход администратора с паролем из копии"
 ok "администратор входит с прежним паролем"
 api GET /api/platform/admin/projects "$ADMIN_TOKEN_B" | jget 'd' | grep -q "$PROJECT_ID" || fail "проекта нет после восстановления"

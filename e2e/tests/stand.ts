@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, type Page } from "@playwright/test";
+import { type APIRequestContext, expect, type Page } from "@playwright/test";
 
 export const STATE_FILE = join(dirname(fileURLToPath(import.meta.url)), "..", ".state", "seed.json");
 
@@ -61,4 +61,17 @@ export function trackNavigations(page: Page): string[] {
     if (frame === page.mainFrame()) seen.push(new URL(frame.url()).pathname);
   });
   return seen;
+}
+
+/**
+ * Токен оболочки для API администрирования (aud=["platform"], контракт v1.1, п. 2.6): вход, затем
+ * POST /auth/platform-token по cookie refresh из того же контекста. Токен из ответа входа (он же
+ * в sessionStorage) на /api/platform/admin/* получает 401.
+ */
+export async function platformToken(request: APIRequestContext, user: { username: string; password: string }): Promise<string> {
+  const r = await request.post("/api/platform/auth/login", { data: { username: user.username, password: user.password } });
+  expect(r.status(), `вход ${user.username}`).toBe(200);
+  const t = await request.post("/api/platform/auth/platform-token");
+  expect(t.status(), `токен платформы ${user.username}`).toBe(200);
+  return ((await t.json()) as { access_token: string }).access_token;
 }

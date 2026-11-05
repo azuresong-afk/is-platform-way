@@ -130,7 +130,7 @@ def test_group_roles_and_projects_flow_into_token(client):
     client.put(f"/admin/groups/{g['id']}/projects", json={"ids": [p["id"]]}, headers=h)
     client.put(f"/admin/groups/{g['id']}/members", json={"ids": [u["id"]]}, headers=h)
     client.put(f"/admin/users/{u['id']}/roles", json={"products": {"scanner": ["auditor"]}}, headers=h)
-    token, _ = login(client, "ivanov", "long-password-1")
+    token, _ = login(client, "ivanov", "long-password-1", platform=False)
     c = claims(token)
     assert c["products"] == {"scanner": ["auditor"], "vm": ["engineer"]}
     assert c["projects"] == [p["id"]]
@@ -140,7 +140,7 @@ def test_role_revocation_applies_on_next_refresh(client):
     h = _admin(client)
     u = _mk_user(client, h)
     client.put(f"/admin/users/{u['id']}/roles", json={"products": {"scanner": ["operator"]}}, headers=h)
-    token, cookie = login(client, "ivanov", "long-password-1")
+    token, cookie = login(client, "ivanov", "long-password-1", platform=False)
     assert claims(token)["products"] == {"scanner": ["operator"]}
     client.put(f"/admin/users/{u['id']}/roles", json={"products": {"scanner": []}}, headers=h)
     r = do_refresh(client, cookie)
