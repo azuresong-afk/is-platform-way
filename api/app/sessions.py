@@ -99,10 +99,13 @@ def find(db: Session, cookie_value: str | None) -> tuple[RefreshToken | None, bo
     return rec, hmac.compare_digest(rec.token_hash, _hash(secret))
 
 
-def rotate(
-    db: Session, cookie_value: str | None, user_agent: str = "", ip: str = ""
-) -> tuple[Issued | None, RefreshToken | None, RefreshError | None]:
-    """Ротация. Коммит — на вызывающем (в т. ч. при ошибке: отзыв семейства надо сохранить)."""
+def check(
+    db: Session, cookie_value: str | None
+) -> tuple[User | None, RefreshToken | None, RefreshError | None]:
+    """Проверка cookie без ротации (те же правила, что у rotate, включая отзыв семейства).
+
+    Коммит — на вызывающем.
+    """
     s = get_settings()
     rec, ok = find(db, cookie_value)
     if rec is None or not ok:
@@ -123,8 +126,18 @@ def rotate(
     if user is None or not can_receive_tokens(user):
         revoke_family(db, rec.family_id, "user_blocked")
         return None, rec, RefreshError.USER_BLOCKED
+    return user, rec, None
+
+
+def rotate(
+    db: Session, cookie_value: str | None, user_agent: str = "", ip: str = ""
+) -> tuple[Issued | None, RefreshToken | None, RefreshError | None]:
+    """Ротация. Коммит — на вызывающем (в т. ч. при ошибке: отзыв семейства надо сохранить)."""
+    user, rec, err = check(db, cookie_value)
+    if err is not None or user is None or rec is None:
+        return None, rec, err
     if rec.used_at is None:
-        rec.used_at = now
+        rec.used_at = utcnow()
     issued = _issue(db, user, rec.family_id, aware(rec.family_expires_at), user_agent, ip)
     return issued, rec, None
 

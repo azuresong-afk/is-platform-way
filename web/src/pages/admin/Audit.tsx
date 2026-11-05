@@ -107,7 +107,7 @@ export function AuditPage() {
     try {
       const params = new URLSearchParams(query);
       params.set("format", format);
-      const r = await apiFetch(`${API}/audit/export?${params}`);
+      const r = await apiFetch(`${API}/audit/export?${params}`, { platform: true });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         throw new Error(typeof body.detail === "string" ? body.detail : `Ошибка ${r.status}`);

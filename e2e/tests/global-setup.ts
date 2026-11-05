@@ -33,7 +33,19 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     return (r.status === 204 ? null : await r.json()) as T;
   };
 
-  const { access_token: admin } = await call<{ access_token: string }>("POST", "/auth/login", null, ADMIN);
+  // API администрирования принимает только токен оболочки (aud=["platform"], контракт v1.1, п. 2.6):
+  // вход ставит cookie refresh, по ней — POST /auth/platform-token.
+  const loginResp = await fetch(`${api}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ADMIN),
+  });
+  if (!loginResp.ok) throw new Error(`POST /auth/login: ${loginResp.status} ${await loginResp.text()}`);
+  const cookie = loginResp.headers.getSetCookie().map((c) => c.split(";")[0]).find((c) => c.startsWith("platform_refresh="));
+  if (!cookie) throw new Error("POST /auth/login: нет cookie platform_refresh");
+  const platformResp = await fetch(`${api}/auth/platform-token`, { method: "POST", headers: { Cookie: cookie } });
+  if (!platformResp.ok) throw new Error(`POST /auth/platform-token: ${platformResp.status} ${await platformResp.text()}`);
+  const { access_token: admin } = (await platformResp.json()) as { access_token: string };
 
   // Манифесты заглушек: платформа опрашивает их в фоне, здесь — принудительно и с ожиданием.
   for (let attempt = 0; ; attempt++) {
