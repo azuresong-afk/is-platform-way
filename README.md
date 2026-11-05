@@ -35,7 +35,7 @@ docker compose --profile fakes up --build
 
 ```bash
 # API (порт 18010)
-cd api && pip install -e ".[dev]"
+cd api && pip install --require-hashes -r requirements-dev.lock && pip install --no-deps -e .
 export DATABASE_URL=postgresql+psycopg://user:pass@127.0.0.1:5432/platform
 export PLATFORM_SECRET_KEY=$(openssl rand -base64 32) COOKIE_SECURE=false
 export BOOTSTRAP_ADMIN_USERNAME=admin BOOTSTRAP_ADMIN_PASSWORD=...
@@ -44,7 +44,7 @@ alembic upgrade head
 uvicorn app.main:create_app --factory --port 18010
 
 # Заглушки продуктов (порты 18000–18002), см. dev/README.md
-cd dev && pip install -r requirements.txt
+cd dev && pip install --require-hashes -r requirements.lock
 
 # Оболочка (порт 5173, прокси на API и заглушки)
 npm ci && npm run dev -w platform-web
