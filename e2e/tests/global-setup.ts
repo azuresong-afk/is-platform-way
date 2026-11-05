@@ -5,9 +5,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import type { FullConfig } from "@playwright/test";
+import { type FullConfig, request } from "@playwright/test";
 
-import { PRODUCTS, type Seed, STATE_FILE } from "./stand";
+import { adoptPassword, PRODUCTS, type Seed, STATE_FILE, temporaryPassword } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -58,12 +58,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       await call<{ id: string }>("POST", "/admin/users", admin, {
         username: USER.username,
         display_name: USER.name,
-        password: USER.password,
+        password: temporaryPassword(USER.password),
       })
     ).id;
   } else {
-    await call("POST", `/admin/users/${userId}/password`, admin, { password: USER.password });
+    await call("POST", `/admin/users/${userId}/password`, admin, { password: temporaryPassword(USER.password) });
   }
+  const ctx = await request.newContext({ baseURL: base });
+  await adoptPassword(ctx, USER.username, USER.password);
+  await ctx.dispose();
   await call("PUT", `/admin/users/${userId}/roles`, admin, { products: ROLES });
   await call("PUT", `/admin/users/${userId}/projects`, admin, {
     all_projects: false,

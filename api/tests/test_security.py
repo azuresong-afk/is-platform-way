@@ -9,7 +9,7 @@ from app.builtin_manifests import BUILTIN_MANIFESTS
 from app.main import create_app
 from app.models import Product
 from app.security.links import is_safe_path
-from tests.helpers import bearer, do_refresh, login
+from tests.helpers import bearer, do_refresh, login, make_user
 from tests.test_events import envelope, post
 
 
@@ -98,7 +98,7 @@ def test_manifest_urls_outside_product_are_dropped(client, db):
     }
     db.commit()
     h = bearer(login(client)[0])
-    u = client.post("/admin/users", json={"username": "op", "password": "long-password-1"}, headers=h).json()
+    u = make_user(client, h, "op")
     client.put(f"/admin/users/{u['id']}/roles", json={"products": {"vm": ["viewer"]}}, headers=h)
     tab = client.get("/products", headers=bearer(login(client, "op", "long-password-1")[0])).json()[0]
     assert tab["base_path"] == "/vm/"

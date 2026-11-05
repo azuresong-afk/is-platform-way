@@ -112,7 +112,13 @@ def _check_projects(db: Session, all_projects: bool, ids: list[uuid.UUID]) -> li
 
 
 def _audit(
-    db: Session, p: Principal, request: Request, action: str, sa: ServiceAccount, details: dict | None = None
+    db: Session,
+    p: Principal,
+    request: Request,
+    action: str,
+    sa: ServiceAccount,
+    details: dict | None = None,
+    sod: bool = False,
 ):
     audit.record(
         db,
@@ -122,7 +128,13 @@ def _audit(
         object=f"service_account/{sa.client_id}",
         ip=client_ip(request),
         details=details or {},
+        sod=sod,
     )
+
+
+def _grants_roles(sa: ServiceAccount) -> bool:
+    """Секрет записи с ролями видит администратор: вызовы продукта от её имени (docs/SECURITY.md, п. 6)."""
+    return sa.is_active is not False and bool(sa.roles)
 
 
 @router.get("", response_model=list[ServiceAccountOut])
@@ -160,6 +172,7 @@ def create_account(
         "service_account.create",
         sa,
         {"target_product": sa.target_product, "roles": roles, "all_projects": sa.all_projects},
+        sod=_grants_roles(sa),
     )
     try:
         db.commit()
@@ -195,7 +208,8 @@ def patch_account(
     if body.is_active is not None:
         sa.is_active = body.is_active
         changes["is_active"] = body.is_active
-    _audit(db, p, request, "service_account.update", sa, changes)
+    widened = "roles" in changes or "all_projects" in changes or changes.get("is_active") is True
+    _audit(db, p, request, "service_account.update", sa, changes, sod=widened and _grants_roles(sa))
     db.commit()
     return _out(sa)
 
@@ -206,7 +220,7 @@ def rotate_secret(
 ):
     sa = _get(db, sid)
     secret = service_accounts.set_secret(sa)
-    _audit(db, p, request, "service_account.secret_rotate", sa)
+    _audit(db, p, request, "service_account.secret_rotate", sa, sod=_grants_roles(sa))
     db.commit()
     return {**_out(sa), "client_secret": secret}
 

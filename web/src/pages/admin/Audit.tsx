@@ -8,7 +8,7 @@ import { AUDIT_RESULT } from "../../labels";
 
 const LIMIT = 50;
 // Фильтры живут в адресе страницы: ссылкой на выборку можно поделиться.
-const KEYS = ["product", "project", "action", "result", "actor", "from", "to"] as const;
+const KEYS = ["product", "project", "action", "result", "actor", "from", "to", "sod"] as const;
 type Key = (typeof KEYS)[number];
 
 /** Дата из поля ввода (локальный день) → граница периода в UTC; «по» — включительно. */
@@ -202,6 +202,10 @@ export function AuditPage() {
               </button>
             ))}
           </div>
+          <label className="checkbox" title="Действия, которыми администратор мог бы получить чужие роли: временные пароли, сервисные записи с ролями">
+            <input type="checkbox" checked={v("sod") === "true"} onChange={(e) => setFilter("sod", e.target.checked ? "true" : "")} />
+            Разделение обязанностей
+          </label>
           {filtered && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={reset}>
               Сбросить
@@ -253,7 +257,10 @@ export function AuditPage() {
                         <span className="tag">{a.product_title}</span>
                       </td>
                       <td>{a.actor_name || (a.actor_sub ? <span className="mono">{a.actor_sub}</span> : <span className="muted">—</span>)}</td>
-                      <td className="mono">{a.action}</td>
+                      <td className="mono">
+                        {a.action}
+                        {a.sod && <SodPill />}
+                      </td>
                       <td>{a.object || <span className="muted">—</span>}</td>
                       <td>{a.project_name ?? (a.project_id ? <span className="mono">{a.project_id}</span> : <span className="muted">—</span>)}</td>
                       <td>
@@ -274,6 +281,17 @@ export function AuditPage() {
   );
 }
 
+function SodPill() {
+  return (
+    <>
+      {" "}
+      <span className="pill pill-warn" title="Возможный обход разделения обязанностей (docs/SECURITY.md, п. 6)">
+        Разделение обязанностей
+      </span>
+    </>
+  );
+}
+
 function ResultPill({ result }: { result: string }) {
   const r = AUDIT_RESULT[result] ?? { label: result, pill: "pill-muted" };
   return <span className={`pill ${r.pill}`}>{r.label}</span>;
@@ -285,7 +303,13 @@ function EntryDrawer({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
     ["Продукт", entry.product_title],
     ["Пользователь", entry.actor_name || "—"],
     ["Идентификатор пользователя", entry.actor_sub ? <span className="mono">{entry.actor_sub}</span> : "—"],
-    ["Действие", <span className="mono">{entry.action}</span>],
+    [
+      "Действие",
+      <>
+        <span className="mono">{entry.action}</span>
+        {entry.sod && <SodPill />}
+      </>,
+    ],
     ["Объект", entry.object || "—"],
     ["Проект", entry.project_name ?? entry.project_id ?? "—"],
     ["Результат", <ResultPill result={entry.result} />],

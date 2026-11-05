@@ -9,14 +9,15 @@ from urllib.parse import unquote
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import access, audit, service_accounts, sessions, users
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import Principal, client_ip, current_principal
-from ..models import User
-from ..security import keys
+from ..deps import Principal, client_ip, principal_allow_temporary
+from ..models import AuditLog, User
+from ..security import keys, passwords
 
 router = APIRouter(tags=["auth"])
 
@@ -37,6 +38,8 @@ class TokenOut(BaseModel):
     token_type: str = "Bearer"
     expires_in: int
     user: UserBrief
+    # Пароль задан администратором: оболочка сразу открывает смену пароля (docs/SECURITY.md, п. 6).
+    password_change_required: bool = False
 
 
 def _set_cookie(response: Response, value: str) -> None:
@@ -70,6 +73,7 @@ def _token_out(db: Session, user: User) -> TokenOut:
         access_token=token,
         expires_in=s.access_ttl_seconds,
         user=UserBrief(id=str(user.id), username=user.username, name=user.display_name),
+        password_change_required=user.password_temporary,
     )
 
 
@@ -242,9 +246,119 @@ def jwks(response: Response, db: Session = Depends(get_db)) -> dict:
     return keys.jwks(db)
 
 
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=passwords.MIN_LENGTH, max_length=1024)
+
+
+def _temporary_set_by(db: Session, user: User) -> AuditLog | None:
+    """Кто и откуда задал временный пароль: последняя запись user.create / user.password."""
+    return db.scalar(
+        select(AuditLog)
+        .where(
+            AuditLog.product == audit.PLATFORM,
+            AuditLog.object == f"user/{user.username}",
+            AuditLog.action.in_(("user.create", "user.password")),
+        )
+        .order_by(AuditLog.time.desc(), AuditLog.id.desc())
+        .limit(1)
+    )
+
+
+@router.post(
+    "/auth/password",
+    response_model=TokenOut,
+    responses={
+        400: {"description": "Новый пароль совпадает с текущим"},
+        403: {"description": "Неверный текущий пароль или запись заблокирована"},
+    },
+)
+def change_password(
+    body: PasswordChangeIn,
+    request: Request,
+    response: Response,
+    p: Principal = Depends(principal_allow_temporary),
+    db: Session = Depends(get_db),
+) -> TokenOut:
+    """Смена своего пароля (в том числе временного, заданного администратором).
+
+    Текущий пароль проверяется как при входе: неудачи считаются в блокировку после
+    LOGIN_MAX_FAILURES. Все сессии закрываются, выдаётся новая — с ролями.
+    """
+    user = p.user
+    ip = client_ip(request)
+    if user.auth_source != "local":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Пароль внешней учётной записи меняется в её источнике"
+        )
+    result, _ = users.check_login(db, user.username, body.current_password)
+    if result != users.LoginResult.OK:
+        audit.record(
+            db,
+            action="auth.password_change",
+            actor_sub=str(user.id),
+            actor_name=user.display_name,
+            object=f"user/{user.username}",
+            result="failure" if result == users.LoginResult.BAD_CREDENTIALS else "denied",
+            ip=ip,
+            details={"reason": result.value},
+        )
+        db.commit()
+        bad = result == users.LoginResult.BAD_CREDENTIALS
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Неверный текущий пароль" if bad else _LOGIN_ERRORS[result]
+        )
+    if passwords.verify_password(body.new_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Новый пароль должен отличаться от текущего")
+    was_temporary = user.password_temporary
+    details: dict = {"was_temporary": was_temporary}
+    sod = False
+    if was_temporary:
+        # Временный пароль сменили с того же адреса, откуда его задал администратор:
+        # возможно, под записью вошёл он сам (docs/SECURITY.md, п. 6). Подсказка, не доказательство.
+        set_by = _temporary_set_by(db, user)
+        if set_by is not None:
+            details["set_by"] = set_by.actor_name
+            sod = bool(ip) and set_by.ip == ip and set_by.actor_sub != str(user.id)
+            details["same_ip_as_admin"] = sod
+    user.password_hash = passwords.hash_password(body.new_password)
+    user.password_temporary = False
+    user.updated_at = utcnow()
+    sessions.revoke_user(db, user.id, "password_changed")
+    issued = sessions.start_session(db, user, request.headers.get("user-agent", ""), ip)
+    out = _token_out(db, user)
+    audit.record(
+        db,
+        action="auth.password_change",
+        actor_sub=str(user.id),
+        actor_name=user.display_name,
+        object=f"user/{user.username}",
+        ip=ip,
+        details=details,
+        sod=sod,
+    )
+    db.commit()
+    _set_cookie(response, issued.cookie_value)
+    response.headers["Cache-Control"] = "no-store"
+    return out
+
+
 @router.get("/me")
-def me(p: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> dict:
+def me(p: Principal = Depends(principal_allow_temporary), db: Session = Depends(get_db)) -> dict:
     u = p.user
+    if u.password_temporary:
+        # Как в токене: до смены временного пароля прав нет.
+        return {
+            "id": str(u.id),
+            "username": u.username,
+            "name": u.display_name,
+            "email": u.email,
+            "auth_source": u.auth_source,
+            "platform_admin": False,
+            "products": {},
+            "projects": [],
+            "password_change_required": True,
+        }
     return {
         "id": str(u.id),
         "username": u.username,
@@ -254,4 +368,5 @@ def me(p: Principal = Depends(current_principal), db: Session = Depends(get_db))
         "platform_admin": u.is_platform_admin,
         "products": access.effective_roles(db, u),
         "projects": access.effective_projects(db, u),
+        "password_change_required": False,
     }

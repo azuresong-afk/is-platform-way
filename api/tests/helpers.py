@@ -37,3 +37,27 @@ def bearer(token: str) -> dict:
 
 def claims(token: str) -> dict:
     return jwt.decode(token, options={"verify_signature": False})
+
+
+def make_user(client, admin_headers, username, password="long-password-1", *, activate=True, **fields):
+    """Пользователь через API администратора. Пароль от администратора временный (docs/SECURITY.md, п. 6),
+    поэтому по умолчанию пользователь сразу сам меняет его на ``password``, как при первом входе."""
+    temporary = f"tmp-{password}"
+    body = {"username": username, "display_name": username, "password": temporary, **fields}
+    r = client.post("/admin/users", json=body, headers=admin_headers)
+    assert r.status_code == 201, r.text
+    if not activate:
+        return r.json()
+    change_password(client, username, temporary, password)
+    return client.get(f"/admin/users/{r.json()['id']}", headers=admin_headers).json()
+
+
+def change_password(client, username, current, new):
+    token, _ = login(client, username, current)
+    r = client.post(
+        "/auth/password",
+        json={"current_password": current, "new_password": new},
+        headers=bearer(token),
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["access_token"], refresh_cookie(r)

@@ -1,5 +1,5 @@
 from app.models import AuditLog
-from tests.helpers import bearer, claims, do_refresh, login
+from tests.helpers import bearer, claims, do_refresh, login, make_user
 
 
 def _admin(client):
@@ -7,10 +7,7 @@ def _admin(client):
 
 
 def _mk_user(client, h, username="ivanov", **kw):
-    body = {"username": username, "display_name": "Иванов И. И.", "password": "long-password-1", **kw}
-    r = client.post("/admin/users", json=body, headers=h)
-    assert r.status_code == 201, r.text
-    return r.json()
+    return make_user(client, h, username, **{"display_name": "Иванов И. И.", **kw})
 
 
 def _mk_project(client, h, name="Аудит ООО «Ромашка»"):

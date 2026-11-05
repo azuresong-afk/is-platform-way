@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 
-import { expectProductPage, login, PRODUCTS, seed, tabs, trackConsoleErrors } from "./stand";
+import { adoptPassword, expectProductPage, login, PRODUCTS, seed, tabs, temporaryPassword, trackConsoleErrors } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -68,12 +68,19 @@ async function ensureUser(request: APIRequestContext, username: string, roles: R
   const found = await call<{ id: string; username: string }[]>("GET", `/admin/users?q=${username}`);
   let id = found.find((u) => u.username === username)?.id;
   if (!id) {
-    id = (await call<{ id: string }>("POST", "/admin/users", { username, display_name: `Приёмка ${username}`, password })).id;
+    id = (
+      await call<{ id: string }>("POST", "/admin/users", {
+        username,
+        display_name: `Приёмка ${username}`,
+        password: temporaryPassword(password),
+      })
+    ).id;
   } else {
     await call("PATCH", `/admin/users/${id}`, { is_active: true });
     await call("POST", `/admin/users/${id}/unlock`);
-    await call("POST", `/admin/users/${id}/password`, { password });
+    await call("POST", `/admin/users/${id}/password`, { password: temporaryPassword(password) });
   }
+  await adoptPassword(request, username, password);
   await call("PUT", `/admin/users/${id}/roles`, { products: roles });
   await call("PUT", `/admin/users/${id}/projects`, { all_projects: false, projects: [{ project_id: seed().projects.alpha }] });
   return { id, username, password, name: `Приёмка ${username}` };

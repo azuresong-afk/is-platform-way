@@ -48,7 +48,25 @@ def effective_projects(db: Session, user: User) -> list[str]:
 
 
 def user_claims(db: Session, user: User) -> dict:
-    """Утверждения access-токена пользователя (контракт v1, п. 2; v1.1, п. 2.1, 2.3)."""
+    """Утверждения access-токена пользователя (контракт v1, п. 2; v1.1, п. 2.1, 2.3).
+
+    Временный пароль (задан администратором) — токен без ролей, проектов и прав администратора,
+    с ``password_change_required``: пароль знает администратор, и войти под ним он не должен
+    получить чужие роли (docs/SECURITY.md, п. 6; контракт v1.1, п. 2.1).
+    """
+    if user.password_temporary:
+        return {
+            "sub": str(user.id),
+            "typ": "user",
+            "aud": [*products.enabled_ids(db), "platform"],
+            "preferred_username": user.username,
+            "name": user.display_name,
+            "auth_source": user.auth_source,
+            "products": {},
+            "projects": [],
+            "platform_admin": False,
+            "password_change_required": True,
+        }
     return {
         "sub": str(user.id),
         "typ": "user",

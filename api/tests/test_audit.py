@@ -86,7 +86,7 @@ def test_invalid_record_rejected_with_422(client, db):
 
 def test_platform_actions_and_filters(client, db):
     h = _admin(client)
-    user = _mk_user(client, h)  # user.create
+    user = _mk_user(client, h, activate=False)  # user.create
     # неудачный вход — auth.login с результатом failure
     client.post("/auth/login", json={"username": "ivanov", "password": "wrong-password"})
     proj = _mk_project(client, h, name="Проект Б")

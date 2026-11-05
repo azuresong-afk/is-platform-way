@@ -2,6 +2,9 @@
 
 Разделение обязанностей: администратор платформы управляет пользователями и доступом,
 но не выдаёт себе роли продуктов, доступ к проектам и не включает себе «все проекты».
+Пароль, который задал администратор, — временный: пока пользователь не сменит его сам,
+токен без ролей (docs/SECURITY.md, п. 6). Действия, которыми администратор мог бы
+получить чужие роли, помечаются в журнале (``sod``).
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from ..security import passwords
 
 router = APIRouter(prefix="/admin", tags=["admin: users"])
 
-MIN_PASSWORD = 10
+MIN_PASSWORD = passwords.MIN_LENGTH
 EMAIL_RE = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 
@@ -76,6 +79,7 @@ class UserOut(BaseModel):
     own_roles: dict[str, list[str]]
     projects: list[dict]
     groups: list[str]
+    password_temporary: bool
 
     @field_validator("email", mode="before")
     @classmethod
@@ -116,6 +120,7 @@ def user_out(db: Session, user: User) -> UserOut:
             {"project_id": str(pid), "project_role": role, "name": name} for pid, role, name in projects_rows
         ],
         groups=[str(g) for g in group_ids],
+        password_temporary=user.password_temporary,
     )
 
 
@@ -193,6 +198,7 @@ def create_user(
         email=body.email,
         password=body.password,
         is_platform_admin=body.is_platform_admin,
+        password_temporary=True,
     )
     audit.record(
         db,
@@ -275,6 +281,8 @@ def set_roles(
         object=f"user/{user.username}",
         ip=client_ip(request),
         details={"before": {k: before.get(k, []) for k in body.products}, "after": clean},
+        # Временный пароль знает администратор: роли такой записи он может получить сам.
+        sod=bool(clean) and user.password_temporary,
     )
     db.commit()
     db.refresh(user)
@@ -340,12 +348,18 @@ def set_password(
     p: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Response:
+    if p.user.id == user_id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Свой пароль меняется в профиле: «Сменить пароль» в меню"
+        )
     user = _get_user(db, user_id)
     if user.auth_source != "local":
         raise HTTPException(
             status.HTTP_409_CONFLICT, detail="Пароль внешней учётной записи меняется в её источнике"
         )
     user.password_hash = passwords.hash_password(body.password)
+    # Пароль знает администратор — временный, пока пользователь не сменит его сам.
+    user.password_temporary = True
     user.updated_at = utcnow()
     # Смена пароля закрывает все сессии пользователя.
     sessions.revoke_user(db, user.id, "password_changed")
@@ -356,6 +370,8 @@ def set_password(
         actor_name=p.name,
         object=f"user/{user.username}",
         ip=client_ip(request),
+        # Чужой пароль, в том числе другого администратора, — вход под этой записью.
+        sod=True,
     )
     db.commit()
     return Response(status_code=204)

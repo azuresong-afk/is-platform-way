@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { initials } from "../lib/format";
@@ -8,10 +8,12 @@ export interface UserMenuProps {
   subtitle?: string;
   onLogout: () => void;
   profileHref?: string;
+  /** Смена своего пароля (только для записей платформы, не внешних). */
+  passwordHref?: string;
 }
 
 /** Меню пользователя в правой части строки вкладок. */
-export function UserMenu({ name, subtitle, onLogout, profileHref }: UserMenuProps) {
+export function UserMenu({ name, subtitle, onLogout, profileHref, passwordHref }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -48,6 +50,12 @@ export function UserMenu({ name, subtitle, onLogout, profileHref }: UserMenuProp
             <a className="menu-item" role="menuitem" href={profileHref}>
               <UserRound size={18} aria-hidden="true" />
               Профиль
+            </a>
+          )}
+          {passwordHref && (
+            <a className="menu-item" role="menuitem" href={passwordHref}>
+              <KeyRound size={18} aria-hidden="true" />
+              Сменить пароль
             </a>
           )}
           <div className="menu-sep" />

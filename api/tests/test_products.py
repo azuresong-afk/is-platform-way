@@ -3,7 +3,7 @@ import httpx
 from app import products
 from app.builtin_manifests import BUILTIN_MANIFESTS
 from app.models import Product
-from tests.helpers import bearer, login
+from tests.helpers import bearer, login, make_user
 
 
 def _mock_client(manifest: dict | None, health_status: int = 200) -> httpx.Client:
@@ -49,7 +49,7 @@ def test_foreign_manifest_rejected(db):
 
 def test_user_sees_only_tabs_with_roles(client):
     h = bearer(login(client)[0])
-    u = client.post("/admin/users", json={"username": "op", "password": "long-password-1"}, headers=h).json()
+    u = make_user(client, h, "op")
     client.put(f"/admin/users/{u['id']}/roles", json={"products": {"vm": ["viewer"]}}, headers=h)
     uh = bearer(login(client, "op", "long-password-1")[0])
     tabs = client.get("/products", headers=uh).json()

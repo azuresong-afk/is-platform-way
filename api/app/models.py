@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +38,9 @@ class User(Base):
     # local | ldap (зарезервировано, LDAP не реализуется без запроса владельца)
     auth_source: Mapped[str] = mapped_column(String(20), default="local")
     password_hash: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Пароль задал администратор (docs/SECURITY.md, п. 6): токен без ролей, пока пользователь
+    # не сменит его сам (POST /auth/password).
+    password_temporary: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_platform_admin: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -199,6 +203,9 @@ class AuditLog(Base):
     ip: Mapped[str] = mapped_column(String(64), default="")
     details: Mapped[dict] = mapped_column(JsonType, default=dict)
     event_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, unique=True)
+    # Действие, которым администратор платформы мог бы обойти разделение обязанностей
+    # (docs/SECURITY.md, п. 6): фильтр «Разделение обязанностей» на экране журнала.
+    sod: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), index=True)
 
 
 class ServiceAccount(Base):

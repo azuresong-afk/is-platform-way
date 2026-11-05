@@ -63,6 +63,8 @@ export interface AdminUser {
   own_roles: Record<string, string[]>;
   projects: { project_id: string; project_role: string; name: string }[];
   groups: string[];
+  /** Пароль задал администратор: роли не действуют, пока пользователь не сменит его сам. */
+  password_temporary: boolean;
 }
 
 export interface ServiceAccount {
@@ -94,6 +96,8 @@ export interface AuditEntry {
   ip: string;
   details: Record<string, unknown>;
   event_id: string | null;
+  /** Действие, которым администратор мог бы обойти разделение обязанностей (docs/SECURITY.md, п. 6). */
+  sod: boolean;
 }
 
 export interface AuditFacets {
