@@ -6,7 +6,7 @@ import pytest
 from app import products
 from app.config import Settings, parse_product_ids
 from app.models import Product
-from tests.helpers import bearer, claims, login
+from tests.helpers import bearer, claims, login, make_user
 
 DEMO_MANIFEST = {
     "id": "demo",
@@ -87,9 +87,7 @@ def test_new_product_gets_placeholder_then_real_manifest(client, db):
     assert prod.title == "Демо" and prod.manifest_fetched_at
 
     h = bearer(login(client)[0])
-    u = client.post(
-        "/admin/users", json={"username": "demouser", "password": "long-password-1"}, headers=h
-    ).json()
+    u = make_user(client, h, "demouser")
     r = client.put(f"/admin/users/{u['id']}/roles", json={"products": {"demo": ["viewer"]}}, headers=h)
     assert r.status_code == 200, r.text
     token = login(client, "demouser", "long-password-1", platform=False)[0]

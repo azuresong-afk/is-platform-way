@@ -60,7 +60,7 @@ def _unauthorized(detail: str = "not_authenticated") -> HTTPException:
     return HTTPException(status.HTTP_401_UNAUTHORIZED, detail=detail, headers={"WWW-Authenticate": "Bearer"})
 
 
-def current_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
+def _principal(request: Request, db: Session) -> Principal:
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer "):
         raise _unauthorized()
@@ -80,6 +80,20 @@ def current_principal(request: Request, db: Session = Depends(get_db)) -> Princi
     if user is None or not can_receive_tokens(user):
         raise _unauthorized("user_blocked")
     return Principal(user=user, claims=claims)
+
+
+def current_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
+    p = _principal(request, db)
+    # Временный пароль (задан администратором): до смены доступны только /me и /auth/password
+    # (docs/SECURITY.md, п. 6). Сверка с БД: сброс пароля действует и на уже выданный токен.
+    if p.user.password_temporary:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="password_change_required")
+    return p
+
+
+def principal_allow_temporary(request: Request, db: Session = Depends(get_db)) -> Principal:
+    """Как current_principal, но пускает с временным паролем: профиль и смена пароля."""
+    return _principal(request, db)
 
 
 def require_admin(p: Principal = Depends(current_principal)) -> Principal:

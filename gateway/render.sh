@@ -13,7 +13,8 @@ OUT="${NGINX_CONF_OUT:-/etc/nginx/conf.d/default.conf}"
 : "${SERVER_NAME:=_}"
 : "${TLS_CERT:=}"
 : "${TLS_KEY:=}"
-# Ограничение частоты входа с одного адреса (docs/SECURITY.md, п. 7): /auth/login и /auth/token.
+# Ограничение частоты входа с одного адреса (docs/SECURITY.md, п. 7): /auth/login, /auth/token
+# и /auth/password (смена пароля проверяет текущий — тоже перебор).
 # Блокировка учётной записи после N неудач защищает одну запись; лимит по адресу — от перебора
 # паролей по многим записям и от того, чтобы чужие попытки блокировали администратора.
 : "${LOGIN_RATE_PER_MINUTE:=10}"
@@ -172,6 +173,7 @@ $(headers)
 S
   auth_limited_location /auth/login
   auth_limited_location /auth/token
+  auth_limited_location /auth/password
   strip_location /api/platform/ "$PLATFORM_API_UPSTREAM"
 
   seen=" "

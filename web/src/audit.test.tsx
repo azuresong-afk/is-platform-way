@@ -26,6 +26,7 @@ const ENTRIES = [
     ip: "10.0.0.5",
     details: { targets: 3 },
     event_id: "22222222-2222-4222-8222-222222222222",
+    sod: false,
   },
   {
     id: 1,
@@ -42,6 +43,7 @@ const ENTRIES = [
     ip: "",
     details: {},
     event_id: null,
+    sod: false,
   },
 ];
 
@@ -119,5 +121,40 @@ describe("Журнал аудита", () => {
     const call = fetchMock.mock.calls.map((c) => new URL(String(c[0]), "https://x")).find((u) => u.pathname.endsWith("/export"));
     expect(call?.searchParams.get("format")).toBe("csv");
     expect(call?.searchParams.get("project")).toBe(P1);
+  });
+
+  it("фильтр «Разделение обязанностей» уходит в запрос, такие записи помечены", async () => {
+    const flagged = {
+      ...ENTRIES[1],
+      id: 3,
+      actor_name: "Администратор",
+      action: "user.password",
+      object: "user/ivanov",
+      result: "success",
+      sod: true,
+    };
+    const fetchMock = vi.fn((url: string) => {
+      const path = url.split("?")[0];
+      if (path === "/api/platform/audit/facets") return json(FACETS);
+      if (path === "/api/platform/audit") return json([flagged, ...ENTRIES], 200, { "X-Total-Count": "3" });
+      return json({ detail: "not found" }, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/admin/audit"]}>
+        <AuditPage />
+      </MemoryRouter>,
+    );
+    const row = (await screen.findByText("user/ivanov")).closest("tr")!;
+    expect(within(row).getByText("Разделение обязанностей", { selector: ".pill" })).toBeInTheDocument();
+    expect(screen.getAllByText("Разделение обязанностей", { selector: ".pill" })).toHaveLength(1);
+
+    await user.click(screen.getByRole("checkbox", { name: "Разделение обязанностей" }));
+    await waitFor(() => {
+      const last = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), "https://x");
+      expect(last.pathname).toBe("/api/platform/audit");
+      expect(last.searchParams.get("sod")).toBe("true");
+    });
   });
 });

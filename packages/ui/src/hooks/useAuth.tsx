@@ -33,6 +33,8 @@ export interface AuthState {
   products: Record<string, string[]>;
   projects: string[];
   isPlatformAdmin: boolean;
+  /** Временный пароль от администратора: ролей нет, пока пользователь не сменит его сам. */
+  passwordChangeRequired: boolean;
   /** Есть ли право: роль → права из permissions; без таблицы прав — совпадение с ролью. */
   has: (perm: string) => boolean;
   hasProduct: (productId: string) => boolean;
@@ -52,6 +54,8 @@ export interface AuthProviderProps {
   permissions?: Record<string, string[]>;
   /** false — не уводить на страницу входа (сама страница входа). */
   requireAuth?: boolean;
+  /** Куда уводить продукт, если пароль временный: смена пароля в оболочке платформы. */
+  passwordHref?: string;
   /**
    * Только для оболочки платформы: fetch/json ходят в /api/platform/* с токеном оболочки
    * (aud=["platform"], контракт v1.1, п. 2.6), а в API продуктов — с токеном из sessionStorage.
@@ -59,7 +63,14 @@ export interface AuthProviderProps {
   platformToken?: boolean;
 }
 
-export function AuthProvider({ children, product, permissions, requireAuth = true, platformToken = false }: AuthProviderProps) {
+export function AuthProvider({
+  children,
+  product,
+  permissions,
+  requireAuth = true,
+  passwordHref = "/password",
+  platformToken = false,
+}: AuthProviderProps) {
   const [token, setTokenState] = useState<string | null>(getToken);
   const [ready, setReady] = useState<boolean>(() => !isTokenExpired(decodeClaims(getToken())));
 
@@ -87,6 +98,14 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
   }, [ready, requireAuth]);
 
   const claims = useMemo(() => decodeClaims(token), [token]);
+  const passwordChangeRequired = Boolean(claims?.password_change_required);
+
+  // В продукте с временным паролем делать нечего (ролей нет): смена пароля — в оболочке.
+  useEffect(() => {
+    if (!product || !ready || !passwordChangeRequired) return;
+    const { pathname, search, hash } = window.location;
+    window.location.assign(`${passwordHref}?next=${encodeURIComponent(pathname + search + hash)}`);
+  }, [product, ready, passwordChangeRequired, passwordHref]);
   const products = useMemo(() => claims?.products ?? {}, [claims]);
   const roles = useMemo(
     () => (product ? (products[product] ?? []) : Array.from(new Set(Object.values(products).flat()))),
@@ -122,6 +141,7 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
       products,
       projects: claims?.projects ?? [],
       isPlatformAdmin: Boolean(claims?.platform_admin),
+      passwordChangeRequired,
       has,
       hasProduct: (id: string) => (products[id] ?? []).length > 0,
       canProject: (id) => Boolean(id) && ((claims?.projects ?? []).includes("*") || (claims?.projects ?? []).includes(id!)),
@@ -129,7 +149,7 @@ export function AuthProvider({ children, product, permissions, requireAuth = tru
       json: scopedJson,
       logout: () => doLogout(),
     }),
-    [ready, token, claims, roles, products, has, scopedFetch, scopedJson],
+    [ready, token, claims, roles, products, has, scopedFetch, scopedJson, passwordChangeRequired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

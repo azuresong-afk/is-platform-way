@@ -136,6 +136,14 @@ export function UsersPage() {
                         ) : (
                           <span className="pill pill-ok">Активен</span>
                         )}
+                        {u.password_temporary && (
+                          <>
+                            {" "}
+                            <span className="pill pill-warn" title="Роли действуют после того, как пользователь сменит пароль сам">
+                              Временный пароль
+                            </span>
+                          </>
+                        )}
                       </td>
                       <td>{formatDateTime(u.last_login_at)}</td>
                     </tr>
@@ -217,7 +225,7 @@ function CreateUserModal({ open, onClose, onCreated }: { open: boolean; onClose:
         <label className="field">
           <span>Временный пароль</span>
           <input className="input" type="password" required minLength={10} autoComplete="new-password" {...field("password")} />
-          <small>Не короче 10 символов</small>
+          <small>Не короче 10 символов. При первом входе пользователь сменит его на свой; до этого роли не действуют.</small>
         </label>
       </form>
     </Modal>
@@ -293,7 +301,27 @@ function UserDrawer({ user, products, projects, teams, onClose, onChanged }: Dra
           <dt>Создан</dt>
           <dd>{formatDateTime(user.created_at)}</dd>
         </div>
+        {user.auth_source === "local" && (
+          <div>
+            <dt>Пароль</dt>
+            <dd>
+              {user.password_temporary ? (
+                <span className="pill pill-warn">Временный — задан администратором</span>
+              ) : (
+                "Задан пользователем"
+              )}
+            </dd>
+          </div>
+        )}
       </dl>
+      {user.password_temporary && (
+        <div className="alert-warn">
+          <Lock size={18} aria-hidden="true" />
+          <div className="alert-body">
+            Роли и проекты начнут действовать, когда пользователь войдёт и сменит временный пароль на свой.
+          </div>
+        </div>
+      )}
 
       <h3>Команды</h3>
       {user.groups.length === 0 ? (
@@ -403,23 +431,27 @@ function UserDrawer({ user, products, projects, teams, onClose, onChanged }: Dra
           {user.is_platform_admin ? "Снять права администратора" : "Сделать администратором платформы"}
         </button>
       </div>
-      {user.auth_source === "local" && (
+      {user.auth_source === "local" && !self && (
         <form
           className="form"
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => send("POST", `/admin/users/${user.id}/password`, { password }), "Пароль изменён, сессии пользователя закрыты.").then(() =>
+            run(
+              () => send("POST", `/admin/users/${user.id}/password`, { password }),
+              "Временный пароль задан, сессии пользователя закрыты. При входе пользователь сменит его на свой.",
+            ).then(() =>
               setPassword(""),
             );
           }}
         >
           <label className="field">
-            <span>Новый пароль</span>
+            <span>Временный пароль</span>
             <input className="input" type="password" minLength={10} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <small>Роли пользователя не действуют, пока он не сменит пароль сам. Действие отмечается в журнале аудита.</small>
           </label>
           <div className="actions">
             <button type="submit" className="btn">
-              Сменить пароль
+              Задать временный пароль
             </button>
           </div>
         </form>

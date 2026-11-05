@@ -21,6 +21,25 @@ export function seed(): Seed {
   return JSON.parse(readFileSync(STATE_FILE, "utf-8")) as Seed;
 }
 
+/**
+ * Пароль от администратора временный (docs/SECURITY.md, п. 6): роли действуют после смены самим
+ * пользователем. Сиды задают `temporaryPassword(password)` и сразу меняют его на `password`.
+ */
+export const temporaryPassword = (password: string) => `tmp-${password}`;
+
+export async function adoptPassword(ctx: APIRequestContext, username: string, password: string): Promise<void> {
+  const current = temporaryPassword(password);
+  const r = await ctx.post("/api/platform/auth/login", { data: { username, password: current } });
+  expect(r.ok(), `вход ${username} с временным паролем: ${r.status()} ${await r.text()}`).toBeTruthy();
+  const body = (await r.json()) as { access_token: string; password_change_required: boolean };
+  expect(body.password_change_required).toBe(true);
+  const c = await ctx.post("/api/platform/auth/password", {
+    headers: { Authorization: `Bearer ${body.access_token}` },
+    data: { current_password: current, new_password: password },
+  });
+  expect(c.ok(), `смена пароля ${username}: ${c.status()} ${await c.text()}`).toBeTruthy();
+}
+
 /** Строка вкладок: у оболочки и у страниц продуктов одна и та же подпись. */
 export const tabs = (page: Page) => page.getByRole("navigation", { name: "Продукты" });
 

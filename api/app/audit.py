@@ -34,10 +34,12 @@ def record(
     ip: str = "",
     project_id: uuid.UUID | None = None,
     details: dict[str, Any] | None = None,
+    sod: bool = False,
 ) -> None:
     """Добавляет запись о действии платформы; коммит — на стороне вызывающего.
 
-    Секреты (пароли, ключи) в details не передавать.
+    Секреты (пароли, ключи) в details не передавать. ``sod`` — действие, которым администратор
+    мог бы получить рабочие роли в обход разделения обязанностей (docs/SECURITY.md, п. 6).
     """
     db.add(
         AuditLog(
@@ -50,6 +52,7 @@ def record(
             ip=ip,
             project_id=project_id,
             details=details or {},
+            sod=sod,
         )
     )
 
@@ -149,6 +152,7 @@ class Filters(BaseModel):
     result: str | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
+    sod: bool | None = None
 
 
 def _escape(text: str) -> str:
@@ -178,4 +182,6 @@ def query(f: Filters) -> Select:
         stmt = stmt.where(AuditLog.time >= f.date_from)
     if f.date_to:
         stmt = stmt.where(AuditLog.time < f.date_to)
+    if f.sod is not None:
+        stmt = stmt.where(AuditLog.sod.is_(f.sod))
     return stmt.order_by(AuditLog.time.desc(), AuditLog.id.desc())

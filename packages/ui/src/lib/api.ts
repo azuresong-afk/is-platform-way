@@ -20,6 +20,13 @@ export interface TokenClaims {
   products?: Record<string, string[]>;
   projects?: string[];
   platform_admin?: boolean;
+  /** local — пароль платформы (можно сменить в оболочке); иначе внешний источник. */
+  auth_source?: string;
+  /**
+   * Пароль задал администратор: в токене нет ролей, пока пользователь не сменит пароль сам
+   * (контракт v1.1, п. 2.1; docs/SECURITY.md, п. 6). Оболочка показывает смену пароля.
+   */
+  password_change_required?: boolean;
   exp?: number;
   iat?: number;
   [key: string]: unknown;

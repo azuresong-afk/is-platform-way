@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { expect, type Page, request as apiRequest, test } from "@playwright/test";
 
-import { login, platformToken } from "./stand";
+import { adoptPassword, login, platformToken, temporaryPassword } from "./stand";
 
 const ADMIN = {
   username: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -79,10 +79,17 @@ test.beforeAll(async ({ baseURL }) => {
   const { body: users } = await admin.call<{ id: string; username: string }[]>("GET", `/admin/users?q=${MEMBER.username}`);
   let id = users.find((u) => u.username === MEMBER.username)?.id;
   if (!id) {
-    id = (await admin.call<{ id: string }>("POST", "/admin/users", { username: MEMBER.username, display_name: MEMBER.name, password: MEMBER.password })).body.id;
+    id = (
+      await admin.call<{ id: string }>("POST", "/admin/users", {
+        username: MEMBER.username,
+        display_name: MEMBER.name,
+        password: temporaryPassword(MEMBER.password),
+      })
+    ).body.id;
   } else {
-    await admin.call("POST", `/admin/users/${id}/password`, { password: MEMBER.password });
+    await admin.call("POST", `/admin/users/${id}/password`, { password: temporaryPassword(MEMBER.password) });
   }
+  await adoptPassword(admin.ctx, MEMBER.username, MEMBER.password);
   const { body: products } = await admin.call<{ id: string }[]>("GET", "/admin/products");
   await admin.call("PUT", `/admin/users/${id}/roles`, { products: Object.fromEntries(products.map((p) => [p.id, []])) });
 });

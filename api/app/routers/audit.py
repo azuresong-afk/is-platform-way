@@ -44,6 +44,7 @@ class AuditOut(BaseModel):
     ip: str
     details: dict[str, Any]
     event_id: uuid.UUID | None
+    sod: bool
 
 
 class Facet(BaseModel):
@@ -65,6 +66,7 @@ def filters(
     result: Literal["success", "failure", "denied"] | None = None,
     date_from: datetime | None = Query(None, alias="from", description="включительно"),
     date_to: datetime | None = Query(None, alias="to", description="не включительно"),
+    sod: bool | None = Query(None, description="true — только действия в обход разделения обязанностей"),
 ) -> audit.Filters:
     return audit.Filters(
         product=product or None,
@@ -74,6 +76,7 @@ def filters(
         result=result,
         date_from=_utc(date_from),
         date_to=_utc(date_to),
+        sod=sod,
     )
 
 
@@ -111,6 +114,7 @@ def _out(a: AuditLog, titles: dict[str, str], names: dict[uuid.UUID, str]) -> Au
         ip=a.ip,
         details=a.details or {},
         event_id=a.event_id,
+        sod=bool(a.sod),
     )
 
 
@@ -167,6 +171,7 @@ COLUMNS = (
     "ip",
     "details",
     "event_id",
+    "sod",
 )
 
 
