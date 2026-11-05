@@ -17,7 +17,7 @@
 | 3 | Лимит тела на вход — общий 20 МБ | низкая | 🔧 64 КБ на `/auth/login` и `/auth/token` |
 | 6 | Администратор платформы может получить рабочие роли в обход запрета «себе»: сервисная учётная запись с ролями, смена пароля чужой записи, новая запись с ролями | средняя | 📌 5.8 |
 | 11 | Токен пользователя с `aud` всех продуктов и платформы уходит в API каждого продукта: взломанный бэкенд продукта может звать API платформы от имени администратора | средняя | 📌 5.9 |
-| 10 | `npm audit`: уязвимые dev-зависимости (vitest 2, vite 5, typescript-eslint), react-router 6 в сборке; Python-зависимости без фиксации версий | низкая | 📌 5.10, остальное ⚖️ (п. 10) |
+| 10 | `npm audit`: уязвимые dev-зависимости (vitest 2, vite 5, typescript-eslint), react-router 6 в сборке; Python-зависимости без фиксации версий | низкая | 🔧 5.10: vitest 5, react-router 7, typescript-eslint 8.72, версии Python с хэшами, аудит шагом CI; Vite 5 ⚖️ (п. 10) |
 
 Критичных находок нет. Всё ниже — по областям из плана шага 5.4.
 
@@ -118,25 +118,27 @@
 | `notify.link` в API: та же дыра (`/\t/…` проходил) | 🔧 `app/security/links.py`, конверт с такой ссылкой — 422; контракт v1.1, п. 6.3 |
 | URL-поля манифеста шли в оболочку как есть; `search_url` и `summary_url` она запрашивает с токеном пользователя | 🔧 платформа отдаёт `api_base`, `search_url`, `summary_url`, `health_url` только под `/api/<id>/` своего продукта, `base_path` — только путь этого origin (иначе `/<id>/`); администратор видит исходный манифест. Контракт v1.1, п. 5.1 |
 | `dangerouslySetInnerHTML`, `innerHTML`, `eval`, `new Function` | ✅ нет ни в оболочке, ни в `@platform/ui`, ни в заглушках; текст продуктов выводится только через React |
-| `react-router` 6: уязвимость открытого редиректа через `\` в `<Link>`/`useNavigate` (GHSA-wrjc-x8rr-h8h6) | ⚖️ оболочка не передаёт в `<Link>`/`navigate` внешние строки; обновление — 📌 5.10 |
+| `react-router` 6: уязвимость открытого редиректа через `\` в `<Link>`/`useNavigate` (GHSA-wrjc-x8rr-h8h6) | 🔧 5.10: react-router 7.18 |
 
 ## 10. Зависимости
 
-`pip-audit` (04.11.2026) по `api/pyproject.toml` (fastapi 0.162.0, starlette 1.10.0, uvicorn 0.54.0, SQLAlchemy 2.1.8, PyJWT 2.15.1, cryptography 50.0.2, httpx 0.28.1, python-multipart 0.0.33 и остальные) и `dev/requirements.txt`: **уязвимостей нет**.
+Шаг 5.10 (05.11.2026). Аудит теперь — задание `audit` в CI на каждый PR: `pip-audit` по файлам фиксированных версий, `npm audit --omit=dev` (должен быть чистым), `npm audit --audit-level=critical` (инструменты разработки) и `npm audit` в `e2e/`.
 
-`npm audit --omit=dev` (то, что попадает в сборку): 2 moderate — `react-router`/`react-router-dom` 6.30 (п. 9, ⚖️). Других нет.
+**Python.** Версии зафиксированы с хэшами: `api/requirements.lock` (образ API), `api/requirements-dev.lock` (то же + pytest и ruff, для CI), `dev/requirements.lock` (образ заглушек). Образы ставят пакеты с `--require-hashes --only-binary=:all:`: сборка повторяема, подменённый в зеркале пакет не установится, а поставка без интернета (5.3) берёт ровно эти версии. Пересобрать файл после правки `pyproject.toml` / `requirements.txt` — команда в заголовке файла; CI проверяет, что файлы не отстали. `pip-audit` по всем трём: **уязвимостей нет** (fastapi 0.162.0, starlette 1.10.0, uvicorn 0.54.0, SQLAlchemy 2.1.8, PyJWT 2.15.1, cryptography 50.0.2, httpx 0.28.1, python-multipart 0.0.33 и остальные).
 
-`npm audit` целиком: ещё 13 — в инструментах сборки и тестов, в образы не попадают:
+**npm, то, что попадает в сборку** (`npm audit --omit=dev`): **уязвимостей нет**. `react-router-dom` 6.30 → 7.18 (п. 9): оболочке понадобилось только убрать флаги `future` у `BrowserRouter`; `@platform/ui` принимает `react-router-dom` `^6.20.0 || ^7.18.5`, так что продукты на 6 подключаются без правок.
 
-| Пакет | Серьёзность | Где | Решение |
-|---|---|---|---|
-| `vitest` 2.1, `tinypool`, `@vitest/mocker`, `vite-node` | critical / moderate | только тесты | 📌 5.10 — vitest 5 |
-| `vite` 5.4, `esbuild` | high / moderate | dev-сервер и сборка | ⚖️ задание фиксирует Vite 5; dev-сервер в установке не запускается, уязвимости касаются его и Windows. Пересмотреть вместе с 5.10 |
-| `typescript-eslint` 8.x, `minimatch` | moderate | линтер | 📌 5.10 |
+**npm, инструменты разработки:**
+
+| Пакет | Было | Стало |
+|---|---|---|
+| `vitest`, `tinypool`, `@vitest/mocker`, `vite-node` (critical) | vitest 2.1 | 🔧 vitest 5.1 |
+| `typescript-eslint`, `minimatch` (moderate) | 8.40, minimatch 10 | 🔧 8.72; `minimatch` поднят до 11 через `overrides` в корневом `package.json` (у `typescript-estree` в диапазоне только уязвимые 10.x; линтер с ним работает) |
+| `vite` 5.4, `esbuild` 0.21 (high / moderate) | — | ⚖️ остаются: задание фиксирует Vite 5. Уязвимости — в dev-сервере (и части — только на Windows); в установке он не запускается, сборка `vite build` их не затрагивает |
+
+Vitest 5 работает только с Vite 6 и новее. Поэтому Vite в репозитории два: **сборка** оболочки и `@platform/ui` — Vite 5 из их `package.json` (`web/node_modules`, `packages/ui/node_modules`), а **тесты** — Vite 7 из корневого `package.json`, который vitest берёт как свой. Файлы `vite.config.ts` общие; в образы и пакет попадает только результат Vite 5.
 
 `e2e/`: уязвимостей нет.
-
-Версии Python-зависимостей не зафиксированы (`>=`): образ API при каждой сборке ставит свежие версии, и результат `pip-audit` выше верен только на дату проверки. 📌 5.10 — файл фиксированных версий с хэшами (он же нужен поставке без интернета, 5.3).
 
 ## 11. Общий origin: принятые свойства архитектуры
 
@@ -151,6 +153,6 @@ cd api && pytest tests/test_security.py          # исправления это
 npm test                                          # isSafePath, safeNext, safeLink
 docker build -t platform-gateway gateway && docker run --rm --entrypoint sh platform-gateway \
   -c "/docker-entrypoint.d/05-render-gateway.sh && nginx -t && grep -A2 'auth/login' /etc/nginx/conf.d/default.conf"
-pip install pip-audit && pip-audit                 # в окружении API
-npm audit --omit=dev
+pip install pip-audit && pip-audit --disable-pip --require-hashes -r api/requirements-dev.lock
+npm audit --omit=dev && npm audit --audit-level=critical
 ```

@@ -17,7 +17,7 @@
 
 ```bash
 cd dev
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 PLATFORM_JWKS_URL=http://127.0.0.1:18010/.well-known/jwks.json \
   PYTHONPATH=. uvicorn main:app --app-dir fake-scanner --port 18000
 ```
