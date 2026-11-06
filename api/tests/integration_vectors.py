@@ -422,7 +422,7 @@ def sample_events() -> list[dict]:
             f"project/{PROJECT_A}",
             {"project_id": PROJECT_A, "name": "Аудит ООО «Ромашка», 2026", "status": "archived"},
         ),
-        env(12, "platform.user.blocked", "platform", f"user/{USER_SUB}", {"sub": USER_SUB}, project_id=None),
+        blocked_envelope(),
         env(
             8,
             "audit.recorded",
@@ -530,6 +530,76 @@ def hmac_cases() -> list[dict]:
     ]
 
 
+# --- мгновенная блокировка (контракт v1.1, п. 6.5) ---------------------------------------------------
+
+BLOCKED_AT = "2026-11-04T16:54:52Z"
+BLOCKED_AT_TS = 1793811292
+HOLD_UNTIL = "2026-11-04T17:10:52Z"  # blocked_at + 15 мин TTL + 60 с допуска
+HOLD_UNTIL_TS = BLOCKED_AT_TS + 960
+OTHER_SUB = "c1b2a394-8576-4e3d-9c2b-1a0f9e8d7c6b"
+
+
+def blocked_envelope() -> dict:
+    return {
+        "id": "7c9e6679-7425-40de-944b-e07fc1f9000c",
+        "type": "platform.user.blocked",
+        "source": "platform",
+        "time": BLOCKED_AT,
+        "project_id": None,
+        "subject": f"user/{USER_SUB}",
+        "data": {"sub": USER_SUB, "blocked_at": BLOCKED_AT, "hold_until": HOLD_UNTIL},
+    }
+
+
+def blocked_cases() -> list[dict]:
+    """Ответ продукта, получившего blocked_envelope(). now — часы продукта в момент запроса."""
+    blocked = [_deny(p, 401, "user_blocked") for p in PRODUCTS]
+    as_valid = [
+        _ok("scanner", ["operator", "cred_audit"], PROJECT_A),
+        _ok("vm", ["engineer"], PROJECT_A),
+        _deny("grc", 403, "no_product_roles"),
+    ]
+    return [
+        {
+            "name": "issued_before_block",
+            "description": "Токен выдан за 5 минут до блокировки, вкладка ещё открыта — 401 сразу, "
+            "во всех продуктах (в grc ролей нет, но 401 раньше 403).",
+            "now": BLOCKED_AT_TS + 3,
+            "token": _encode(_user_claims(iat=BLOCKED_AT_TS - 300, jti=_jti(0x21))),
+            "checks": blocked,
+        },
+        {
+            "name": "issued_same_second",
+            "description": "iat = blocked_at: граница включительно (платформа округляет blocked_at вверх).",
+            "now": BLOCKED_AT_TS + 3,
+            "token": _encode(_user_claims(iat=BLOCKED_AT_TS, jti=_jti(0x22))),
+            "checks": blocked,
+        },
+        {
+            "name": "issued_after_unblock",
+            "description": "Пользователя разблокировали, он вошёл снова: iat > blocked_at — как обычно.",
+            "now": BLOCKED_AT_TS + 120,
+            "token": _encode(_user_claims(iat=BLOCKED_AT_TS + 60, jti=_jti(0x23))),
+            "checks": as_valid,
+        },
+        {
+            "name": "other_user",
+            "description": "Другой sub с тем же iat — блокировка его не касается.",
+            "now": BLOCKED_AT_TS + 3,
+            "token": _encode(_user_claims(sub=OTHER_SUB, iat=BLOCKED_AT_TS - 300, jti=_jti(0x24))),
+            "checks": as_valid,
+        },
+        {
+            "name": "after_hold_until",
+            "description": "Позже hold_until запись удалена. Настоящий токен, выданный до блокировки, "
+            "к этому времени истёк; здесь exp далеко, чтобы показать: списка больше нет.",
+            "now": HOLD_UNTIL_TS + 1,
+            "token": _encode(_user_claims(iat=BLOCKED_AT_TS - 300, jti=_jti(0x25))),
+            "checks": as_valid,
+        },
+    ]
+
+
 # --- запись файлов ---------------------------------------------------------------------------------
 
 
@@ -558,6 +628,14 @@ def files() -> dict[str, str]:
             }
         ),
         "events.json": dump({"envelopes": sample_events()}),
+        "blocked.json": dump(
+            {
+                "rule": "sub из события и iat <= blocked_at — 401 user_blocked; запись живёт до hold_until",
+                "jwks": "jwks.json",
+                "event": blocked_envelope(),
+                "cases": blocked_cases(),
+            }
+        ),
         "hmac.json": dump({"algorithm": "HMAC-SHA256", "header": "X-Signature", "cases": hmac_cases()}),
     }
 

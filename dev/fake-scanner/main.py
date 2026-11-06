@@ -34,7 +34,12 @@ MANIFEST = {
     "summary_url": "/api/scanner/summary",
     "events": {
         "webhook": "/events/platform",
-        "subscribe": ["vm.remediation.verified", "platform.keys.rotated", "platform.project.updated"],
+        "subscribe": [
+            "vm.remediation.verified",
+            "platform.keys.rotated",
+            "platform.project.updated",
+            "platform.user.blocked",
+        ],
     },
 }
 

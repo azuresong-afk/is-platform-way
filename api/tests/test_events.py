@@ -223,6 +223,45 @@ def test_platform_publishes_project_updated(client, db, vm_subscribed):
     assert len(db.scalars(select(Delivery)).all()) == 2
 
 
+def test_platform_publishes_user_blocked(client, db, vm_subscribed):
+    """Мгновенная блокировка в продуктах (шаг 5.6, контракт v1.1, п. 6.5)."""
+    from datetime import UTC, datetime
+
+    from app import users
+    from tests.helpers import claims
+
+    vm_subscribed.types = ["platform.user.blocked"]
+    victim = users.create_user(db, username="victim", password="pw-123456")
+    db.commit()
+    token = login(client, "victim", "pw-123456", platform=False)[0]
+    h = bearer(login(client)[0])
+    assert client.patch(f"/admin/users/{victim.id}", json={"is_active": False}, headers=h).status_code == 200
+    db.expire_all()
+    ev = db.scalars(select(Event).where(Event.type == "platform.user.blocked")).one()
+    assert ev.source == "platform" and ev.project_id is None and ev.subject == f"user/{victim.id}"
+    assert set(ev.data) == {"sub", "blocked_at", "hold_until"} and ev.data["sub"] == str(victim.id)
+    at = lambda s: datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC).timestamp()  # noqa: E731
+    # Токен, выданный до блокировки, попадает под правило iat <= blocked_at и истекает до hold_until.
+    c = claims(token)
+    assert c["iat"] <= at(ev.data["blocked_at"]) and c["exp"] + 60 <= at(ev.data["hold_until"])
+    assert len(db.scalars(select(Delivery)).all()) == 1
+
+
+def test_blocked_event_data_rounds_up():
+    from datetime import UTC, datetime
+
+    from app import users
+
+    d = users.blocked_event_data(uuid.UUID(int=1), datetime(2026, 11, 6, 21, 0, 0, 200000, tzinfo=UTC))
+    assert d == {
+        "sub": "00000000-0000-0000-0000-000000000001",
+        "blocked_at": "2026-11-06T21:00:01Z",
+        "hold_until": "2026-11-06T21:16:01Z",
+    }
+    exact = users.blocked_event_data(uuid.UUID(int=1), datetime(2026, 11, 6, 21, 0, 0, tzinfo=UTC))
+    assert exact["blocked_at"] == "2026-11-06T21:00:00Z"
+
+
 def test_handler_hook_runs_in_same_transaction(client, db):
     calls = []
 

@@ -238,7 +238,8 @@ def patch_user(
         setattr(user, field, value)
     if changes.get("is_active") is False:
         sessions.revoke_user(db, user.id, "user_blocked")
-        events.publish(db, "platform.user.blocked", {"sub": str(user.id)}, subject=f"user/{user.id}")
+        data = users.blocked_event_data(user.id)
+        events.publish(db, "platform.user.blocked", data, subject=f"user/{user.id}")
     audit.record(
         db,
         action="user.update",

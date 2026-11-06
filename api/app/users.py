@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import math
+import uuid
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
 from sqlalchemy import func, select
@@ -12,6 +14,7 @@ from .config import get_settings
 from .db import aware, utcnow
 from .models import User
 from .security import passwords
+from .security.keys import CLOCK_SKEW_SECONDS
 
 
 class LoginResult(StrEnum):
@@ -109,3 +112,21 @@ def ensure_bootstrap_admin(db: Session) -> User | None:
     )
     db.commit()
     return user
+
+
+def _iso(dt: datetime) -> str:
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def blocked_event_data(user_id: uuid.UUID, now: datetime | None = None) -> dict:
+    """data события platform.user.blocked (контракт v1.1, п. 6.5).
+
+    blocked_at — момент блокировки, округлённый вверх до секунды: продукт отвергает токены этого sub
+    с iat <= blocked_at, и токен, выданный параллельным refresh в ту же секунду, тоже не пройдёт.
+    hold_until — когда истекут (с допуском часов) все access-токены, выданные до блокировки;
+    после этого запись продукту больше не нужна. Продукту не нужно знать TTL токенов платформы.
+    """
+    now = aware(now) or utcnow()
+    blocked = datetime.fromtimestamp(math.ceil(now.timestamp()), UTC)
+    hold = blocked + timedelta(seconds=get_settings().access_ttl_seconds + CLOCK_SKEW_SECONDS)
+    return {"sub": str(user_id), "blocked_at": _iso(blocked), "hold_until": _iso(hold)}

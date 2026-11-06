@@ -39,6 +39,7 @@ MANIFEST = {
             "scanner.asset.*",
             "platform.keys.rotated",
             "platform.project.updated",
+            "platform.user.blocked",
         ],
     },
 }

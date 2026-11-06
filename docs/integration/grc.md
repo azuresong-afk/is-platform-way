@@ -42,7 +42,7 @@
  "nav":[{"id":"systems","label":"Объекты","path":"/grc/systems","icon":"building-2","perm":"view"},
         {"id":"documents","label":"Документы","path":"/grc/documents","icon":"file-text","perm":"view"}],
  "search_url":"/api/grc/search","health_url":"/api/grc/health/ready","summary_url":"/api/grc/summary",
- "events":{"webhook":"/events/platform","subscribe":["scanner.run.finished","platform.keys.rotated","platform.project.updated"]}}
+ "events":{"webhook":"/events/platform","subscribe":["scanner.run.finished","platform.keys.rotated","platform.project.updated","platform.user.blocked"]}}
 ```
 
 Подписка на `scanner.run.finished` нужна, только если используются результаты «Сканера» (п. 5); на события платформы — всем (README, п. 7.3).
