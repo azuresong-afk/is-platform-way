@@ -184,8 +184,10 @@ test.describe("критерии приёмки", () => {
     ).toBe(401);
     // Платформа отвергает и уже выданный токен заблокированного (TESTING 2.5).
     expect((await user.get("/api/platform/me", { headers: bearer(t2) })).status()).toBe(401);
-    // Продукт без сверки со списком отзыва принимает его до exp (вопрос владельцу 3 в дорожной карте).
-    expect((await user.get("/api/grc/me", { headers: bearer(t2) })).status()).toBe(200);
+    // Продукты тоже отвергают его за секунды: подписаны на platform.user.blocked (шаг 5.6, контракт v1.1, п. 6.5).
+    await expect
+      .poll(async () => (await user.get("/api/grc/me", { headers: bearer(t2) })).status(), { timeout: 15_000 })
+      .toBe(401);
     await call("PATCH", `/admin/users/${u.id}`, { is_active: true });
     await user.dispose();
   });

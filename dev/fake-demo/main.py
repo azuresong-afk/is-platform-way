@@ -21,6 +21,8 @@ MANIFEST = {
     "search_url": "/api/demo/search",
     "health_url": "/api/demo/health/ready",
     "summary_url": "/api/demo/summary",
+    # Мгновенная блокировка (контракт v1.1, п. 6.5) — без доработки платформы, только подписка.
+    "events": {"webhook": "/events/platform", "subscribe": ["platform.user.blocked"]},
 }
 
 

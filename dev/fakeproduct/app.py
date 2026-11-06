@@ -22,7 +22,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
 from . import db
-from .auth import Caller, JwksCache, require_project, verify_request
+from .auth import BlockedUsers, Caller, JwksCache, require_project, verify_request
 
 
 @dataclass
@@ -59,9 +59,10 @@ def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
         os.environ.get("PLATFORM_JWKS_URL", "http://platform-api:8000/.well-known/jwks.json")
     )
     app.state.events = []
+    app.state.blocked = BlockedUsers()
 
     def caller(request: Request) -> Caller:
-        return verify_request(request, pid, request.app.state.jwks)
+        return verify_request(request, pid, request.app.state.jwks, blocked=request.app.state.blocked)
 
     def chaos() -> None:
         delay = float(os.environ.get("FAKE_DELAY_SECONDS", "0") or 0)
@@ -158,6 +159,8 @@ def make_app(spec: ProductSpec, jwks: JwksCache | None = None) -> FastAPI:
             if event.get("type") == "platform.keys.rotated":
                 data = event.get("data") or {}
                 request.app.state.jwks.rotated(str(data.get("kid", "")), list(data.get("revoked") or []))
+            if event.get("type") == "platform.user.blocked":
+                request.app.state.blocked.event(event.get("data") or {}, event.get("time"))
             return {"accepted": True}
 
         @app.get("/events/received")

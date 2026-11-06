@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
-from fakeproduct.auth import JwksCache
+from fakeproduct.auth import BlockedUsers, JwksCache
 
 DEV = Path(__file__).resolve().parents[1]
 PROJECT = str(uuid.uuid4())
@@ -38,11 +38,13 @@ def token(
     exp_in=900,
     key=KEY,
     kid=KID,
+    sub=None,
+    iat=None,
 ):
-    now = int(time.time())
+    now = int(time.time()) if iat is None else iat
     claims = {
         "iss": "platform",
-        "sub": str(uuid.uuid4()),
+        "sub": sub or str(uuid.uuid4()),
         "aud": list(aud),
         "typ": "user",
         "preferred_username": "ivanov",
@@ -245,3 +247,59 @@ def test_keys_rotated_webhook(monkeypatch):
     sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
     assert c.post("/events/platform", content=body, headers={"x-signature": sig}).status_code == 202
     assert c.get("/me", headers=h(viewer)).status_code == 401
+
+
+def test_blocked_users_rule():
+    """platform.user.blocked (контракт v1.1, п. 6.5): iat <= blocked_at — отказ; позже — пропуск."""
+    now = [1793811292.0]
+    b = BlockedUsers(clock=lambda: now[0])
+    b.event({"sub": "u1", "blocked_at": "2026-11-04T16:54:52Z", "hold_until": "2026-11-04T17:10:52Z"})
+    at = 1793811292
+    assert b.is_blocked("u1", at - 300) and b.is_blocked("u1", at)
+    assert not b.is_blocked("u1", at + 1) and not b.is_blocked("u2", at - 300)
+    # Запоздавшая доставка более раннего события не сдвигает момент назад.
+    b.event({"sub": "u1", "blocked_at": "2026-11-04T16:00:00Z"})
+    assert b.is_blocked("u1", at)
+    # После hold_until запись не нужна: токены, выданные до блокировки, уже истекли.
+    now[0] = at + 961
+    assert len(b) == 0 and not b.is_blocked("u1", at)
+    # Без blocked_at — время конверта; без hold_until — 15 мин + 60 с.
+    b.event({"sub": "u3"}, "2026-11-04T17:10:53Z")
+    assert b.is_blocked("u3", at + 961) and len(b) == 1
+    now[0] = at + 961 + 960 + 1
+    assert len(b) == 0
+    # Мусор в событии не роняет обработчик и ничего не блокирует.
+    b.event({"sub": "u4", "blocked_at": "вчера"})
+    b.event({"blocked_at": "2026-11-04T16:54:52Z"})
+    assert len(b) == 0
+
+
+def test_user_blocked_webhook_cuts_open_session(product, monkeypatch):
+    """Открытая вкладка теряет доступ сразу после события, а не через 15 минут; новый вход — проходит."""
+    pid, c = product
+    monkeypatch.setenv("PLATFORM_EVENTS_SECRET", "s3cret")
+    sub = str(uuid.uuid4())
+    before = token({pid: ["viewer"]}, sub=sub, iat=int(time.time()) - 5)
+    other = token({pid: ["viewer"]})
+    assert c.get("/me", headers=h(before)).status_code == 200
+    now = int(time.time())
+    iso = lambda t: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))  # noqa: E731
+    ev = {
+        "id": str(uuid.uuid4()),
+        "type": "platform.user.blocked",
+        "source": "platform",
+        "time": iso(now),
+        "project_id": None,
+        "subject": f"user/{sub}",
+        "data": {"sub": sub, "blocked_at": iso(now), "hold_until": iso(now + 960)},
+    }
+    body = json.dumps(ev).encode()
+    sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    assert c.post("/events/platform", content=body, headers={"x-signature": sig}).status_code == 202
+    r = c.get("/me", headers=h(before))
+    assert r.status_code == 401 and r.json()["detail"] == "user_blocked"
+    # 401, а не 403, и там, где ролей нет: фронтенд сделает refresh, получит 401 и уйдёт на вход.
+    assert c.get("/me", headers=h(token({}, sub=sub, iat=now - 5))).status_code == 401
+    assert c.get("/me", headers=h(other)).status_code == 200
+    # Разблокировали и вошёл снова: токен выдан после blocked_at.
+    assert c.get("/me", headers=h(token({pid: ["viewer"]}, sub=sub, iat=now + 1))).status_code == 200
