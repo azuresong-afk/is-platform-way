@@ -52,6 +52,7 @@
 | 3 | `kid` есть и найден в JWKS. Не найден — перечитать JWKS сразу, но не чаще раза в 30 с; кэш JWKS — 10 мин | `401 invalid_token` |
 | 4 | Подпись Ed25519 ключом с этим `kid` | `401 invalid_token` |
 | 5 | `iss` = `platform`; `exp` и `iat` есть, `exp` не истёк с допуском 60 с; свой id есть в `aud` | `401 invalid_token` |
+| 5а | `sub` нет в списке заблокированных с `blocked_at >= iat` (раздел 7.4 ниже, контракт п. 6.5) | `401 {"detail":"user_blocked"}` |
 | 6 | В `products.<свой id>` непустой список ролей | `403 {"detail":"no_product_roles"}` |
 | 7 | Для запросов в проект: `projects` содержит `"*"` или uuid проекта | `403 {"detail":"no_project_access"}` |
 
@@ -178,9 +179,60 @@ X-Signature: sha256=<hex HMAC-SHA256(тело, PLATFORM_EVENTS_SECRET)>
 |---|---|---|
 | `platform.keys.rotated` | `{kid, revoked[]}` | `kid` — ключ, который начал подписывать; непустой `revoked` — сразу сбросить кэш JWKS и отвергать эти `kid` (п. 2) |
 | `platform.project.updated` | `{project_id, name, status}` | обновить теневой проект; `archived` — перевести в режим «только чтение» |
-| `platform.user.blocked` | `{sub}` | необязательно: завершить свои фоновые операции от имени пользователя. Выданный access-токен живёт до 15 минут (см. вопрос 3 в `docs/roadmap.md`) |
+| `platform.user.blocked` | `{sub, blocked_at, hold_until}` | **обязательно:** сразу отвергать токены этого `sub` с `iat <= blocked_at` (раздел 7.4); по желанию — остановить свои фоновые операции от имени пользователя |
 
 `project_id` в конвертах `platform.keys.rotated` и `platform.user.blocked` — `null`. Примеры — `vectors/events.json`.
+
+### 7.4. Мгновенная блокировка (п. 6.5)
+
+Решение владельца от 06.11.2026: заблокированный пользователь теряет доступ к продуктам за секунды, в том числе в уже открытых вкладках. Платформа сама отзывает его refresh-сессии и не выдаёт новых токенов; продукт отвечает за уже выданный access-токен (живёт до 15 минут).
+
+1. Добавьте `"platform.user.blocked"` в `events.subscribe` манифеста.
+2. В обработчике `events.webhook` (после проверки HMAC и идемпотентности по `id`, раздел 7.2) запомните `sub → blocked_at` до `hold_until`. При повторной доставке берите наибольший `blocked_at`.
+3. В проверке токена после шага 5 (подпись, сроки, `aud`) и **до** ролей: `sub` в списке и `iat <= blocked_at` — `401 user_blocked`. Это 401 и там, где ролей у пользователя нет: фронтенд сделает refresh, получит 401 и уйдёт на вход, ничего дописывать во фронтенде не нужно.
+4. Токены с `iat > blocked_at` пропускайте: пользователя разблокировали, и он вошёл снова. События о разблокировке нет.
+
+`blocked_at` и `iat` — по часам платформы, поэтому сдвиг часов продукта на правило не влияет. Сравнение — в целых секундах: `iat` всегда целый, `blocked_at` платформа округляет вверх.
+
+Python (эталон — `BlockedUsers` в `dev/fakeproduct/auth.py` репозитория платформы, проходит `vectors/blocked.json`):
+
+```python
+import math, threading, time
+from datetime import datetime
+
+def _ts(s: str) -> float:
+    return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+
+class BlockedUsers:
+    def __init__(self):
+        self._items: dict[str, tuple[int, float]] = {}   # sub -> (blocked_at, hold_until)
+        self._lock = threading.Lock()
+
+    def event(self, data: dict, envelope_time: str) -> None:        # из webhook
+        at = math.floor(_ts(data.get("blocked_at") or envelope_time))
+        until = _ts(data["hold_until"]) if data.get("hold_until") else at + 960
+        with self._lock:
+            prev = self._items.get(data["sub"])
+            if prev is None or at > prev[0]:
+                self._items[data["sub"]] = (at, max(until, prev[1]) if prev else until)
+
+    def is_blocked(self, sub: str, iat: int) -> bool:               # из проверки токена
+        now = time.time()
+        with self._lock:
+            for s in [s for s, (_, u) in self._items.items() if u < now]:
+                del self._items[s]
+            item = self._items.get(sub)
+        return item is not None and iat <= item[0]
+
+# в проверке токена, после jwt.decode(...):
+if blocked.is_blocked(claims["sub"], claims["iat"]):
+    raise HTTPException(401, detail="user_blocked", headers={"WWW-Authenticate": "Bearer"})
+```
+
+- **Несколько экземпляров API.** Платформа доставляет событие один раз на продукт, а не каждому экземпляру. Если API продукта запущен в нескольких копиях, держите список в общей БД продукта (таблица `blocked_users(sub, blocked_at, hold_until)`, чистка по `hold_until`) или в Redis.
+- **Перезапуск.** Список в памяти после перезапуска пуст: до 15 минут действует прежнее правило. Хотите строже — та же таблица в БД.
+- **Продукт был недоступен.** Платформа повторит доставку через 1, 5, 15 мин (раздел 7.2); событие с прошедшим `hold_until` можно просто принять (`2xx`) и не запоминать.
+- **Что не меняется.** Отзыв роли и удаление из проекта — по-прежнему при следующем refresh, не позже 15 мин. Блокировка после неудачных попыток входа события не публикует. Сервисные токены (`svc:*`) не затрагиваются. Режим `AUTH_MODE=local` — как раньше.
 
 ## 8. Фронтенд (п. 2.4, 9, 11)
 
@@ -209,6 +261,7 @@ X-Signature: sha256=<hex HMAC-SHA256(тело, PLATFORM_EVENTS_SECRET)>
 | `jwks.json` | JWKS с двумя ключами Ed25519 (`20261104-vec00001` — active, `20261104-vec00002` — next) |
 | `jwt.json` | 16 подписанных токенов и ожидаемый ответ продукта на каждый: `200` с ролями и `typ`, `401 invalid_token`, `403 no_product_roles` / `no_project_access` |
 | `hmac.json` | тела событий, секреты, заголовки и признак `valid` для проверки HMAC в обе стороны |
+| `blocked.json` | событие `platform.user.blocked` и токены до, в ту же секунду и после блокировки, другого пользователя, после `hold_until`: ожидаемый ответ продукта с учётом списка заблокированных (раздел 7.4). `now` — часы продукта в момент запроса |
 | `events.json` | по одному корректному конверту на каждый тип события из п. 6.2, включая события платформы; все проходят схему шины событий платформы |
 | `signing-keys.TEST-ONLY.json` | seed тестовых ключей — чтобы подписывать свои токены в тестах. **Ключи опубликованы, в установках не использовать** |
 
@@ -252,11 +305,11 @@ def test_platform_jwt(client_with_jwks, case):
 
 - [ ] `AUTH_MODE=local` работает как раньше (регресс-тесты зелёные).
 - [ ] Продукт понимает переменные комплекта (п. 1); миграции и восстановление из копии проходят пользователем БД без прав суперпользователя (п. 1.1).
-- [ ] Все векторы `jwt.json` и `hmac.json` проходят в тестах продукта.
+- [ ] Все векторы `jwt.json`, `blocked.json` и `hmac.json` проходят в тестах продукта.
 - [ ] Теневые пользователи и теневые проекты создаются при первом обращении; создание проектов в режиме `platform` запрещено.
 - [ ] `GET /manifest`, `/health/ready`, `/summary`, `/search` отвечают по контракту.
 - [ ] Outbox: событие пишется в одной транзакции с изменением, доставка переживает рестарт, повторы 1/5/15/60.
 - [ ] Каждая запись своего журнала аудита уходит событием `audit.recorded`.
-- [ ] Подписка на `platform.keys.rotated` и `platform.project.updated`; непустой `revoked` или незнакомый `kid` сбрасывает кэш JWKS.
+- [ ] Подписка на `platform.keys.rotated`, `platform.project.updated` и `platform.user.blocked`; непустой `revoked` или незнакомый `kid` сбрасывает кэш JWKS; токен заблокированного пользователя, выданный до блокировки, получает `401 user_blocked` (раздел 7.4).
 - [ ] Фронтенд собран с `VITE_BASE=/<id>/`, `VITE_API_BASE=/api/<id>`, `VITE_PLATFORM=1`; 401/403/выход по п. 2.4, включая «выход отовсюду» по сигналу `platform.logout`.
-- [ ] На стенде платформы (`docker compose up` с upstream вашего продукта вместо заглушки): вход в оболочке открывает продукт без повторного входа; выход в любой вкладке сразу уводит на вход все вкладки продукта; пользователь без ролей не видит вкладку и получает 403 от API; карточка на Главной заполнена.
+- [ ] На стенде платформы (`docker compose up` с upstream вашего продукта вместо заглушки): вход в оболочке открывает продукт без повторного входа; выход в любой вкладке сразу уводит на вход все вкладки продукта; блокировка пользователя в «Администрирование → Пользователи» за секунды даёт `401 user_blocked` уже открытой вкладке продукта; пользователь без ролей не видит вкладку и получает 403 от API; карточка на Главной заполнена.

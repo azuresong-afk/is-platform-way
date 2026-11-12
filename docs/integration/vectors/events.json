@@ -184,7 +184,9 @@
       "project_id": null,
       "subject": "user/6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
       "data": {
-        "sub": "6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b"
+        "sub": "6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
+        "blocked_at": "2026-11-04T16:54:52Z",
+        "hold_until": "2026-11-04T17:10:52Z"
       }
     },
     {

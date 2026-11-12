@@ -1,0 +1,161 @@
+{
+  "rule": "sub из события и iat <= blocked_at — 401 user_blocked; запись живёт до hold_until",
+  "jwks": "jwks.json",
+  "event": {
+    "id": "7c9e6679-7425-40de-944b-e07fc1f9000c",
+    "type": "platform.user.blocked",
+    "source": "platform",
+    "time": "2026-11-04T16:54:52Z",
+    "project_id": null,
+    "subject": "user/6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
+    "data": {
+      "sub": "6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b",
+      "blocked_at": "2026-11-04T16:54:52Z",
+      "hold_until": "2026-11-04T17:10:52Z"
+    }
+  },
+  "cases": [
+    {
+      "name": "issued_before_block",
+      "description": "Токен выдан за 5 минут до блокировки, вкладка ещё открыта — 401 сразу, во всех продуктах (в grc ролей нет, но 401 раньше 403).",
+      "now": 1793811295,
+      "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYxMTA0LXZlYzAwMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJwbGF0Zm9ybSIsInN1YiI6IjZmMWQyYzNiLTRhNTktNGU2Zi04YTdiLTljMGQxZTJmM2E0YiIsInR5cCI6InVzZXIiLCJhdWQiOlsic2Nhbm5lciIsInZtIiwiZ3JjIl0sInByZWZlcnJlZF91c2VybmFtZSI6Iml2YW5vdiIsIm5hbWUiOiJcdTA0MThcdTA0MzJcdTA0MzBcdTA0M2RcdTA0M2VcdTA0MzIgXHUwNDE4LiBcdTA0MTguIiwiYXV0aF9zb3VyY2UiOiJsb2NhbCIsInByb2R1Y3RzIjp7InNjYW5uZXIiOlsib3BlcmF0b3IiLCJjcmVkX2F1ZGl0Il0sInZtIjpbImVuZ2luZWVyIl19LCJwcm9qZWN0cyI6WyIzZTJhOGMxZi01YjdkLTRmOWUtYTFjMy02ZDhiMGUyZjRhNjEiXSwicGxhdGZvcm1fYWRtaW4iOmZhbHNlLCJpYXQiOjE3OTM4MTA5OTIsImV4cCI6NDEwMjQ0NDgwMCwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDIxIn0.TA3pth669smE5CEgDjWhljfQ7MDMVg3K1aZK5G7uwoMsMhaLRvry5rKsswAyq9X_GDBuc9gGF7pvv5w5bcVMDQ",
+      "checks": [
+        {
+          "product": "scanner",
+          "status": 401,
+          "detail": "user_blocked"
+        },
+        {
+          "product": "vm",
+          "status": 401,
+          "detail": "user_blocked"
+        },
+        {
+          "product": "grc",
+          "status": 401,
+          "detail": "user_blocked"
+        }
+      ]
+    },
+    {
+      "name": "issued_same_second",
+      "description": "iat = blocked_at: граница включительно (платформа округляет blocked_at вверх).",
+      "now": 1793811295,
+      "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYxMTA0LXZlYzAwMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJwbGF0Zm9ybSIsInN1YiI6IjZmMWQyYzNiLTRhNTktNGU2Zi04YTdiLTljMGQxZTJmM2E0YiIsInR5cCI6InVzZXIiLCJhdWQiOlsic2Nhbm5lciIsInZtIiwiZ3JjIl0sInByZWZlcnJlZF91c2VybmFtZSI6Iml2YW5vdiIsIm5hbWUiOiJcdTA0MThcdTA0MzJcdTA0MzBcdTA0M2RcdTA0M2VcdTA0MzIgXHUwNDE4LiBcdTA0MTguIiwiYXV0aF9zb3VyY2UiOiJsb2NhbCIsInByb2R1Y3RzIjp7InNjYW5uZXIiOlsib3BlcmF0b3IiLCJjcmVkX2F1ZGl0Il0sInZtIjpbImVuZ2luZWVyIl19LCJwcm9qZWN0cyI6WyIzZTJhOGMxZi01YjdkLTRmOWUtYTFjMy02ZDhiMGUyZjRhNjEiXSwicGxhdGZvcm1fYWRtaW4iOmZhbHNlLCJpYXQiOjE3OTM4MTEyOTIsImV4cCI6NDEwMjQ0NDgwMCwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDIyIn0.vceV68k-7MXYLOOCg4FnjywO4ZOou5RiLp5ct0sm96RQHEZ4ONri6Rwxyklw6_jnQHuM2TMNa6aQBLpDmjMUBg",
+      "checks": [
+        {
+          "product": "scanner",
+          "status": 401,
+          "detail": "user_blocked"
+        },
+        {
+          "product": "vm",
+          "status": 401,
+          "detail": "user_blocked"
+        },
+        {
+          "product": "grc",
+          "status": 401,
+          "detail": "user_blocked"
+        }
+      ]
+    },
+    {
+      "name": "issued_after_unblock",
+      "description": "Пользователя разблокировали, он вошёл снова: iat > blocked_at — как обычно.",
+      "now": 1793811412,
+      "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYxMTA0LXZlYzAwMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJwbGF0Zm9ybSIsInN1YiI6IjZmMWQyYzNiLTRhNTktNGU2Zi04YTdiLTljMGQxZTJmM2E0YiIsInR5cCI6InVzZXIiLCJhdWQiOlsic2Nhbm5lciIsInZtIiwiZ3JjIl0sInByZWZlcnJlZF91c2VybmFtZSI6Iml2YW5vdiIsIm5hbWUiOiJcdTA0MThcdTA0MzJcdTA0MzBcdTA0M2RcdTA0M2VcdTA0MzIgXHUwNDE4LiBcdTA0MTguIiwiYXV0aF9zb3VyY2UiOiJsb2NhbCIsInByb2R1Y3RzIjp7InNjYW5uZXIiOlsib3BlcmF0b3IiLCJjcmVkX2F1ZGl0Il0sInZtIjpbImVuZ2luZWVyIl19LCJwcm9qZWN0cyI6WyIzZTJhOGMxZi01YjdkLTRmOWUtYTFjMy02ZDhiMGUyZjRhNjEiXSwicGxhdGZvcm1fYWRtaW4iOmZhbHNlLCJpYXQiOjE3OTM4MTEzNTIsImV4cCI6NDEwMjQ0NDgwMCwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDIzIn0.5TSyvPD2NMD5btwaVU4qqft5EB2pUpXojE1Uvs7Q-HYVkbEd4MNk3HtqUljGN0vd5s4ZeadK7AibQlcoABV8Bw",
+      "checks": [
+        {
+          "product": "scanner",
+          "status": 200,
+          "roles": [
+            "operator",
+            "cred_audit"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "vm",
+          "status": 200,
+          "roles": [
+            "engineer"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "grc",
+          "status": 403,
+          "detail": "no_product_roles"
+        }
+      ]
+    },
+    {
+      "name": "other_user",
+      "description": "Другой sub с тем же iat — блокировка его не касается.",
+      "now": 1793811295,
+      "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYxMTA0LXZlYzAwMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJwbGF0Zm9ybSIsInN1YiI6ImMxYjJhMzk0LTg1NzYtNGUzZC05YzJiLTFhMGY5ZThkN2M2YiIsInR5cCI6InVzZXIiLCJhdWQiOlsic2Nhbm5lciIsInZtIiwiZ3JjIl0sInByZWZlcnJlZF91c2VybmFtZSI6Iml2YW5vdiIsIm5hbWUiOiJcdTA0MThcdTA0MzJcdTA0MzBcdTA0M2RcdTA0M2VcdTA0MzIgXHUwNDE4LiBcdTA0MTguIiwiYXV0aF9zb3VyY2UiOiJsb2NhbCIsInByb2R1Y3RzIjp7InNjYW5uZXIiOlsib3BlcmF0b3IiLCJjcmVkX2F1ZGl0Il0sInZtIjpbImVuZ2luZWVyIl19LCJwcm9qZWN0cyI6WyIzZTJhOGMxZi01YjdkLTRmOWUtYTFjMy02ZDhiMGUyZjRhNjEiXSwicGxhdGZvcm1fYWRtaW4iOmZhbHNlLCJpYXQiOjE3OTM4MTA5OTIsImV4cCI6NDEwMjQ0NDgwMCwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDI0In0.UU_HENVacO2eFJRnfyAxIxZrGp4-bhf31e2y5pAIjYBm2dfsT0rlVE9Ycet-RsL0crG2TsGVBQZypnx6l6bVDQ",
+      "checks": [
+        {
+          "product": "scanner",
+          "status": 200,
+          "roles": [
+            "operator",
+            "cred_audit"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "vm",
+          "status": 200,
+          "roles": [
+            "engineer"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "grc",
+          "status": 403,
+          "detail": "no_product_roles"
+        }
+      ]
+    },
+    {
+      "name": "after_hold_until",
+      "description": "Позже hold_until запись удалена. Настоящий токен, выданный до блокировки, к этому времени истёк; здесь exp далеко, чтобы показать: списка больше нет.",
+      "now": 1793812253,
+      "token": "eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYxMTA0LXZlYzAwMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJwbGF0Zm9ybSIsInN1YiI6IjZmMWQyYzNiLTRhNTktNGU2Zi04YTdiLTljMGQxZTJmM2E0YiIsInR5cCI6InVzZXIiLCJhdWQiOlsic2Nhbm5lciIsInZtIiwiZ3JjIl0sInByZWZlcnJlZF91c2VybmFtZSI6Iml2YW5vdiIsIm5hbWUiOiJcdTA0MThcdTA0MzJcdTA0MzBcdTA0M2RcdTA0M2VcdTA0MzIgXHUwNDE4LiBcdTA0MTguIiwiYXV0aF9zb3VyY2UiOiJsb2NhbCIsInByb2R1Y3RzIjp7InNjYW5uZXIiOlsib3BlcmF0b3IiLCJjcmVkX2F1ZGl0Il0sInZtIjpbImVuZ2luZWVyIl19LCJwcm9qZWN0cyI6WyIzZTJhOGMxZi01YjdkLTRmOWUtYTFjMy02ZDhiMGUyZjRhNjEiXSwicGxhdGZvcm1fYWRtaW4iOmZhbHNlLCJpYXQiOjE3OTM4MTA5OTIsImV4cCI6NDEwMjQ0NDgwMCwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDI1In0.oRBW-6kmUDg94cFSUEDtiFVSPlfnTi5fmItn5O3M5_22Z6jkOg_2GprUD9ckSptUzekz-rsNtwB2S9KRA9ncBw",
+      "checks": [
+        {
+          "product": "scanner",
+          "status": 200,
+          "roles": [
+            "operator",
+            "cred_audit"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "vm",
+          "status": 200,
+          "roles": [
+            "engineer"
+          ],
+          "typ": "user",
+          "project": "3e2a8c1f-5b7d-4f9e-a1c3-6d8b0e2f4a61"
+        },
+        {
+          "product": "grc",
+          "status": 403,
+          "detail": "no_product_roles"
+        }
+      ]
+    }
+  ]
+}

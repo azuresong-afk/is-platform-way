@@ -33,7 +33,12 @@ MANIFEST = {
     "summary_url": "/api/grc/summary",
     "events": {
         "webhook": "/events/platform",
-        "subscribe": ["scanner.run.finished", "platform.keys.rotated", "platform.project.updated"],
+        "subscribe": [
+            "scanner.run.finished",
+            "platform.keys.rotated",
+            "platform.project.updated",
+            "platform.user.blocked",
+        ],
     },
 }
 

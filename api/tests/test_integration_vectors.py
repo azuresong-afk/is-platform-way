@@ -141,7 +141,7 @@ DATA_FIELDS = {
     "grc.assessment.updated": {"system_id", "title", "percent", "status"},
     "platform.keys.rotated": {"kid", "revoked"},
     "platform.project.updated": {"project_id", "name", "status"},
-    "platform.user.blocked": {"sub"},
+    "platform.user.blocked": {"sub", "blocked_at", "hold_until"},
     "audit.recorded": {"time", "actor", "action", "object", "result", "ip", "details"},
 }  # fmt: skip
 
@@ -161,3 +161,48 @@ def test_event_envelopes():
             assert e["notify"]["link"].startswith("/") and not e["notify"]["link"].startswith("//")
         ids.add(e["id"])
     assert len(ids) == len(envelopes)
+
+
+BLOCKED = _load("blocked.json")
+
+
+def _ts(value: str) -> int:
+    from datetime import datetime
+
+    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
+
+
+@pytest.mark.parametrize("case", BLOCKED["cases"], ids=[c["name"] for c in BLOCKED["cases"]])
+def test_blocked_vectors(vector_keys, case):
+    """Правило п. 6.5 поверх проверки токена: sub из события, iat <= blocked_at, до hold_until."""
+    from app.security import keys
+
+    data = BLOCKED["event"]["data"]
+    blocked_at, hold_until = _ts(data["blocked_at"]), _ts(data["hold_until"])
+    for check in case["checks"]:
+        expected = {k: v for k, v in check.items() if k not in ("product", "project")}
+        try:
+            claims = keys.verify(vector_keys, case["token"], audience=check["product"])
+        except jwt.PyJWTError:
+            claims = None
+        listed = case["now"] <= hold_until
+        if claims and listed and claims["sub"] == data["sub"] and claims["iat"] <= blocked_at:
+            got = {"status": 401, "detail": "user_blocked"}
+        else:
+            got = _product_answer(vector_keys, case["token"], check["product"], check.get("project"))
+        assert got == expected, (case["name"], check)
+
+
+def test_blocked_event_matches_platform():
+    """Конверт в векторах — такой, какой публикует платформа (users.blocked_event_data)."""
+    import uuid
+    from datetime import datetime
+
+    from app import users
+
+    data = BLOCKED["event"]["data"]
+    at = datetime.fromisoformat(data["blocked_at"].replace("Z", "+00:00"))
+    assert users.blocked_event_data(uuid.UUID(data["sub"]), at) == data
+    assert BLOCKED["event"] in _load("events.json")["envelopes"]
+    names = {c["name"] for c in BLOCKED["cases"]}
+    assert {"issued_before_block", "issued_same_second", "issued_after_unblock", "after_hold_until"} <= names

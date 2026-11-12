@@ -46,7 +46,7 @@
  "nav":[{"id":"queue","label":"Очередь","path":"/vm/queue","icon":"list-checks","perm":"view"},
         {"id":"windows","label":"Окна обслуживания","path":"/vm/windows","icon":"calendar","perm":"view"}],
  "search_url":"/api/vm/search","health_url":"/api/vm/health/ready","summary_url":"/api/vm/summary",
- "events":{"webhook":"/events/platform","subscribe":["scanner.run.finished","scanner.asset.*","platform.keys.rotated","platform.project.updated"]}}
+ "events":{"webhook":"/events/platform","subscribe":["scanner.run.finished","scanner.asset.*","platform.keys.rotated","platform.project.updated","platform.user.blocked"]}}
 ```
 
 ## 3. Сводка и поиск
